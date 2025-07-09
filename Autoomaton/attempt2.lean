@@ -49,14 +49,14 @@ noncomputable def fairVisits2 (V : RankingFunction a) : Finset ℕ :=  Set.Finit
 
 theorem Soundness (V : RankingFunction a) : a.IsFairEmpty :=  by
   intros r
-  by_contra c
+  by_contra r_fair
   by_cases empty : (fairVisits2 a r V) = ∅
   simp only [Set.Finite.toFinset_eq_empty] at empty
-  rcases (c 0) with ⟨x, y, z⟩
-  · have x_mem_s : x ∈ {n | a.F (r.f n) } := by
-      simp only [Set.mem_setOf_eq, z]
+  rcases (r_fair 0) with ⟨x, x_gt_0, x_fair⟩
+  · have x_mem_s : x ∈ fairVisits a r := by
+      simp only [Set.mem_setOf_eq, x_fair]
     simp only [empty, Set.mem_empty_iff_false] at x_mem_s
-  · rcases c (Finset.max' (fairVisits2 a r V) (Finset.nonempty_of_ne_empty empty)) with ⟨x, y, z⟩
-    simp only [Finset.max'_lt_iff, Set.Finite.mem_toFinset, Set.mem_setOf_eq] at y
-    have : x < x := y x z
+  · rcases r_fair (Finset.max' (fairVisits2 a r V) (Finset.nonempty_of_ne_empty empty)) with ⟨x, x_gt_max, x_fair⟩
+    simp only [Finset.max'_lt_iff, Set.Finite.mem_toFinset, Set.mem_setOf_eq] at x_gt_max
+    have x_lt_x : x < x := x_gt_max x x_fair
     omega
