@@ -43,37 +43,39 @@ def fairVisits : Set ℕ := { n : Nat | a.F (r.f n) }
 
 noncomputable def nth_visit (n : Nat) : Nat := Nat.nth (fun m => a.F (r.f m)) n
 
-lemma BoundedFairVisits36 : nth_visit a r (V.V (r.f 0)) ∈ upperBounds (fairVisits a r) := by
-  simp [BddAbove, upperBounds, Nonempty]
-  intros x x_fair
-  simp [nth_visit]
-  sorry
-
-lemma BoundedFairVisits38 (y : Nat) : V.V (r.f y) + Nat.count (fun m => a.F (r.f m)) y ≤ V.V (r.f 0)  := by
+lemma count_remaining (y : Nat) : V.V (r.f y) + Nat.count (fun m => a.F (r.f m)) y ≤ V.V (r.f 0) := by
   induction' y with i ih
   · simp only [Nat.count_zero, add_zero, le_refl]
   · simp only [Nat.count_succ]
     have n : V.V (r.f (i + 1)) + (if a.F (r.f i) then 1 else 0) ≤ V.V (r.f i) := V.C4 (r.f i) (r.f (i + 1)) (r.IsValid i)
     omega
 
-lemma BoundedFairVisits39 (inf : Set.Infinite (fairVisits a r)) (y : Nat) :  Nat.count (fun m => a.F (r.f m)) (nth_visit a r y) = y := by
+lemma count_bounded (y : Nat) : Nat.count (fun m => a.F (r.f m)) y ≤ V.V (r.f 0) := by
+  have x := count_remaining a r V y
+  omega
+
+lemma count_nth (inf : Set.Infinite (fairVisits a r)) (y : Nat) : Nat.count (fun m => a.F (r.f m)) (nth_visit a r y) = y := by
   exact Nat.count_nth (by
     intro hf
     contradiction)
 
-lemma BoundedFairVisits310 (inf : Set.Infinite (fairVisits a r)) : V.V (r.f (nth_visit a r (V.V (r.f 0)))) = 0  := by
-  have x1 := BoundedFairVisits38 a r V (nth_visit a r (V.V (r.f 0)))
-  simp only [BoundedFairVisits39 a r inf (V.V (r.f 0)), add_le_iff_nonpos_left, nonpos_iff_eq_zero] at x1
+lemma count_finite {p : Nat → Prop} [DecidablePred p] {x : Nat} (f : (n : Nat) → Nat.count p n ≤ x) : Set.Finite (setOf p) := by
+  by_contra c
+  simp [← Set.Infinite.eq_1 ] at c
+  have t := Nat.count_nth_of_infinite c (x + 1)
+  have y := f (Nat.nth p (x + 1))
+  omega
+
+lemma fair_visits_finite (V : RankingFunction a) : Set.Finite (fairVisits a r) := by
+  exact count_finite (count_bounded a r V)
+
+lemma ranking_function_zero (inf : Set.Infinite (fairVisits a r)) : V.V (r.f (nth_visit a r (V.V (r.f 0)))) = 0  := by
+  have x1 := count_remaining a r V (nth_visit a r (V.V (r.f 0)))
+  simp only [count_nth a r inf (V.V (r.f 0)), add_le_iff_nonpos_left, nonpos_iff_eq_zero] at x1
   exact x1
 
-lemma BoundedFairVisits3 (V : RankingFunction a) :  Set.Finite (fairVisits a r) := by
-  have y :  BddAbove (fairVisits a r) := by
-    apply (Set.nonempty_of_mem)
-    exact BoundedFairVisits36 a r V
-  exact BddAbove.finite y
-
 @[simp, reducible]
-noncomputable def fairVisits2 (V : RankingFunction a) : Finset ℕ :=  Set.Finite.toFinset (BoundedFairVisits3 a r V)
+noncomputable def fairVisits2 (V : RankingFunction a) : Finset ℕ :=  Set.Finite.toFinset (fair_visits_finite a r V)
 
 theorem Soundness (V : RankingFunction a) : a.IsFairEmpty :=  by
   intros r
