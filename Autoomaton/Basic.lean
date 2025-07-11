@@ -37,8 +37,3 @@ structure Computation {W : Type} (p : Program W) : Type where
   next : ∀ (x : Nat), p.R (σ x) (σ (x + 1))
 
 def IsCorrect {W : Type} {p : Program W} (φ ψ : Computation p → Prop): Prop := ∀ (c : Computation p), φ c → ψ c
-
-
-def Vardi44 {W S : Type} {p : Program W}
-  (φ ψ : Computation p → Prop) (A : RecursiveBuchi S W)
-  (w : c): IsCorrect φ ψ ↔  RankingFunction S

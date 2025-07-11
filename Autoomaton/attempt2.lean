@@ -40,7 +40,7 @@ variable (V : RankingFunction a)
 def fairVisits : Set ℕ := { n : Nat | a.F (r.f n) }
 
 @[simp, reducible]
-def fairCount (y : Nat) : Nat := Nat.count (fun m => a.F (r.f m)) y
+def fairCount : Nat → Nat := Nat.count (fun m => a.F (r.f m))
 
 noncomputable def nth_visit (n : Nat) : Nat := Nat.nth (fun m => a.F (r.f m)) n
 
@@ -76,7 +76,7 @@ lemma ranking_function_zero (inf : Set.Infinite (fairVisits a r)) : V.V (r.f (nt
 noncomputable def fairVisits2 (V : RankingFunction a) : Finset ℕ := Set.Finite.toFinset (fair_visits_finite a r V)
 
 theorem Soundness (V : RankingFunction a) : a.IsFairEmpty :=  by
-  intros r
+  intro r
   by_contra r_fair
   by_cases empty : (fairVisits2 a r V) = ∅
   · simp only [Set.Finite.toFinset_eq_empty] at empty
