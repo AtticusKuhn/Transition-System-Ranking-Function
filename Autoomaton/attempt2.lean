@@ -1,6 +1,10 @@
 import Mathlib.Data.Nat.Count
 import Mathlib.Data.Set.Card
 import Mathlib.Data.Finset.Max
+import Mathlib.Order.Interval.Finset.Basic
+import Mathlib.Order.Interval.Finset.Nat
+import Mathlib.Data.Nat.Nth
+
 
 structure Automaton (S : Type) : Type where
   R : S → S → Bool
@@ -30,19 +34,42 @@ structure RankingFunction {S : Type} (A : Automaton S) : Type where
   V : S → Nat
   C1 : ∀ (s : S), A.F s → ∀ (s' : S), A.R s s' → V s' < V s
   C2 : ∀ (s : S), ¬ A.F s → ∀ (s' : S), A.R s s' → V s' ≤ V s
+  C4 : ∀ (s1 s2 : S), A.R s1 s2 → V s2 + (if A.F s1 then 1 else 0) ≤ V s1
 
 @[simp, reducible]
 def fairVisits : Set ℕ := { n : Nat | a.F (r.f n) }
 
-lemma BoundedFairVisits2 (V : RankingFunction a) (r : Run a) :  Set.encard (fairVisits a r) < V.V (r.f 0) := by
-  simp [fairVisits]
+noncomputable def nth_visit (n : Nat) : Nat := Nat.nth (fun m => a.F (r.f m)) n
+
+lemma BoundedFairVisits36 (V : RankingFunction a) (r : Run a)  :  nth_visit a r (V.V (r.f 0)) ∈ upperBounds (fairVisits a r) := by
+  simp [BddAbove, upperBounds, Nonempty]
+  intros x x_fair
+  simp [nth_visit]
   sorry
+
+lemma BoundedFairVisits38 (V : RankingFunction a) (r : Run a) (y : Nat) : V.V (r.f y) + Nat.count (fun m => a.F (r.f m)) y ≤ V.V (r.f 0)  := by
+  induction' y with i ih
+  · simp only [Nat.count_zero, add_zero, le_refl]
+  · simp only [Nat.count_succ]
+    have n : V.V (r.f (i + 1)) + (if a.F (r.f i) then 1 else 0) ≤ V.V (r.f i) := V.C4 (r.f i) (r.f (i + 1)) (r.IsValid i)
+    omega
+
+lemma BoundedFairVisits39 (r : Run a) (inf : Set.Infinite (fairVisits a r)) (y : Nat) :  Nat.count (fun m => a.F (r.f m)) (nth_visit a r y) = y := by
+  exact Nat.count_nth (by
+    intro hf
+    contradiction)
+
+lemma BoundedFairVisits310 (V : RankingFunction a) (r : Run a) (inf : Set.Infinite (fairVisits a r)) : V.V (r.f (nth_visit a r (V.V (r.f 0)))) = 0  := by
+  have x1 := BoundedFairVisits38 a V r (nth_visit a r (V.V (r.f 0)))
+  simp only [BoundedFairVisits39 a r inf (V.V (r.f 0)), add_le_iff_nonpos_left, nonpos_iff_eq_zero] at x1
+  exact x1
 
 lemma BoundedFairVisits3 (V : RankingFunction a) (r : Run a)  :  Set.Finite (fairVisits a r) := by
-  sorry
-
-lemma BoundedFairVisits4 (V : RankingFunction a) (r : Run a) (n : Nat) :  Set.encard { m : Nat | a.F (r.f (m + n)) } < V.V (r.f n) := by
-  sorry
+  have y :  BddAbove (fairVisits a r) := by
+    -- simp [BddAbove, upperBounds, Nonempty, ]
+    apply (Set.nonempty_of_mem)
+    exact BoundedFairVisits36 a V r
+  exact BddAbove.finite y
 
 @[simp, reducible]
 noncomputable def fairVisits2 (V : RankingFunction a) : Finset ℕ :=  Set.Finite.toFinset (BoundedFairVisits3 a V r)
