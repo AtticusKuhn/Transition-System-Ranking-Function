@@ -13,7 +13,7 @@ structure Automaton (S : Type) : Type where
 
 structure Run {S : Type} (A : Automaton S) : Type where
   f : Nat → S
-  IsInitialized :  A.I (f 0)
+  IsInitialized : A.I (f 0)
   IsValid : ∀ (n : Nat), A.R (f n) (f n.succ)
 
 variable {S : Type} (a : Automaton S) (r : Run a)
@@ -32,8 +32,6 @@ def Automaton.IsFairEmpty : Prop := ∀ (r : Run a), r.IsFairEmpty
 
 structure RankingFunction {S : Type} (A : Automaton S) : Type where
   V : S → Nat
-  C1 : ∀ (s : S), A.F s → ∀ (s' : S), A.R s s' → V s' < V s
-  C2 : ∀ (s : S), ¬ A.F s → ∀ (s' : S), A.R s s' → V s' ≤ V s
   C4 : ∀ (s1 s2 : S), A.R s1 s2 → V s2 + (if A.F s1 then 1 else 0) ≤ V s1
 
 variable (V : RankingFunction a)
@@ -41,49 +39,49 @@ variable (V : RankingFunction a)
 @[simp, reducible]
 def fairVisits : Set ℕ := { n : Nat | a.F (r.f n) }
 
+@[simp, reducible]
+def fairCount (y : Nat) : Nat := Nat.count (fun m => a.F (r.f m)) y
+
 noncomputable def nth_visit (n : Nat) : Nat := Nat.nth (fun m => a.F (r.f m)) n
 
-lemma count_remaining (y : Nat) : V.V (r.f y) + Nat.count (fun m => a.F (r.f m)) y ≤ V.V (r.f 0) := by
+lemma count_remaining (y : Nat) : V.V (r.f y) + fairCount a r y ≤ V.V (r.f 0) := by
   induction' y with i ih
   · simp only [Nat.count_zero, add_zero, le_refl]
-  · simp only [Nat.count_succ]
+  · simp only [Nat.count_succ, fairCount] at *
     have n : V.V (r.f (i + 1)) + (if a.F (r.f i) then 1 else 0) ≤ V.V (r.f i) := V.C4 (r.f i) (r.f (i + 1)) (r.IsValid i)
     omega
 
-lemma count_bounded (y : Nat) : Nat.count (fun m => a.F (r.f m)) y ≤ V.V (r.f 0) := by
-  have x := count_remaining a r V y
+lemma count_bounded (y : Nat) : fairCount a r y ≤ V.V (r.f 0) := by
+  have := count_remaining a r V y
   omega
 
-lemma count_nth (inf : Set.Infinite (fairVisits a r)) (y : Nat) : Nat.count (fun m => a.F (r.f m)) (nth_visit a r y) = y := by
-  exact Nat.count_nth (by
+lemma count_nth (inf : Set.Infinite (fairVisits a r)) (y : Nat) : fairCount a r (nth_visit a r y) = y := Nat.count_nth (by
     intro hf
     contradiction)
 
 lemma count_finite {p : Nat → Prop} [DecidablePred p] {x : Nat} (f : (n : Nat) → Nat.count p n ≤ x) : Set.Finite (setOf p) := by
   by_contra c
-  simp [← Set.Infinite.eq_1 ] at c
-  have t := Nat.count_nth_of_infinite c (x + 1)
   have y := f (Nat.nth p (x + 1))
-  omega
+  simp only [Nat.count_nth_of_infinite c (x + 1), add_le_iff_nonpos_right, nonpos_iff_eq_zero,
+    one_ne_zero] at y
 
-lemma fair_visits_finite (V : RankingFunction a) : Set.Finite (fairVisits a r) := by
-  exact count_finite (count_bounded a r V)
+lemma fair_visits_finite (V : RankingFunction a) : Set.Finite (fairVisits a r) := count_finite (count_bounded a r V)
 
-lemma ranking_function_zero (inf : Set.Infinite (fairVisits a r)) : V.V (r.f (nth_visit a r (V.V (r.f 0)))) = 0  := by
+lemma ranking_function_zero (inf : Set.Infinite (fairVisits a r)) : V.V (r.f (nth_visit a r (V.V (r.f 0)))) = 0 := by
   have x1 := count_remaining a r V (nth_visit a r (V.V (r.f 0)))
   simp only [count_nth a r inf (V.V (r.f 0)), add_le_iff_nonpos_left, nonpos_iff_eq_zero] at x1
   exact x1
 
 @[simp, reducible]
-noncomputable def fairVisits2 (V : RankingFunction a) : Finset ℕ :=  Set.Finite.toFinset (fair_visits_finite a r V)
+noncomputable def fairVisits2 (V : RankingFunction a) : Finset ℕ := Set.Finite.toFinset (fair_visits_finite a r V)
 
 theorem Soundness (V : RankingFunction a) : a.IsFairEmpty :=  by
   intros r
   by_contra r_fair
   by_cases empty : (fairVisits2 a r V) = ∅
-  simp only [Set.Finite.toFinset_eq_empty] at empty
-  rcases (r_fair 0) with ⟨x, x_gt_0, x_fair⟩
-  · have x_mem_s : x ∈ fairVisits a r := by
+  · simp only [Set.Finite.toFinset_eq_empty] at empty
+    rcases (r_fair 0) with ⟨x, _, x_fair⟩
+    have x_mem_s : x ∈ fairVisits a r := by
       simp only [Set.mem_setOf_eq, x_fair]
     simp only [empty, Set.mem_empty_iff_false] at x_mem_s
   · rcases r_fair (Finset.max' (fairVisits2 a r V) (Finset.nonempty_of_ne_empty empty)) with ⟨x, x_gt_max, x_fair⟩
