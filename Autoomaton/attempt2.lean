@@ -4,7 +4,8 @@ import Mathlib.Data.Finset.Max
 import Mathlib.Order.Interval.Finset.Basic
 import Mathlib.Order.Interval.Finset.Nat
 import Mathlib.Data.Nat.Nth
-
+import Mathlib.SetTheory.Ordinal.Basic
+import Mathlib.Order.OrderIsoNat
 
 structure Automaton (S : Type) : Type where
   R : S → S → Bool
@@ -88,3 +89,60 @@ theorem Soundness (V : RankingFunction a) : a.IsFairEmpty :=  by
     simp only [Finset.max'_lt_iff, Set.Finite.mem_toFinset, Set.mem_setOf_eq] at x_gt_max
     have x_lt_x : x < x := x_gt_max x x_fair
     omega
+
+theorem Soundness2 (V : RankingFunction a) : a.IsFairEmpty :=  by
+  intro r
+  by_contra r_fair
+  have empty : fairVisits2 a r V ≠ ∅ := by
+    intro e
+    simp only [Set.Finite.toFinset_eq_empty] at e
+    rcases (r_fair 0) with ⟨x, _, x_fair⟩
+    apply Set.notMem_empty x
+    simp only [← e, fairVisits, Set.mem_setOf_eq, x_fair]
+  rcases r_fair (Finset.max' (fairVisits2 a r V) (Finset.nonempty_of_ne_empty empty)) with ⟨x, x_gt_max, x_fair⟩
+  simp only [Finset.max'_lt_iff, Set.Finite.mem_toFinset] at x_gt_max
+  have x_lt_x : x < x := x_gt_max x x_fair
+  omega
+
+universe u
+
+structure OrdinalRankingFunction {S : Type} (A : Automaton S) : Type (u + 1) where
+  V : S → Ordinal.{u}
+  C4 : ∀ (s1 s2 : S), A.R s1 s2 → V s2 + (if A.F s1 then 1 else 0) ≤ V s1
+
+variable (W : OrdinalRankingFunction a)
+
+noncomputable def OrdSeq : Nat → Ordinal := fun n => W.V (r.f (nth_visit a r n))
+
+theorem fair_infinite (r_fair : r.IsFair a) : Set.Infinite (fairVisits a r) := by
+  simp only [Set.infinite_iff_exists_gt, Set.mem_setOf_eq]
+  intro a
+  rcases (r_fair a) with ⟨k, k_gt_a, k_fair⟩
+  exact ⟨k, ⟨k_fair, by omega⟩⟩
+
+theorem nth_visit_fair (n : Nat) (r_fair : r.IsFair a) :  a.F (r.f (nth_visit a r n)) := by
+  exact Nat.nth_mem_of_infinite (fair_infinite a r r_fair) n
+
+theorem nth_succ (r_fair : r.IsFair a) (n : ℕ) : OrdSeq a r W (n + 1) < OrdSeq a r W n := by
+  simp [OrdSeq, nth_visit, Nat.succ_eq_add_one]
+  have x : nth_visit a r n < nth_visit a r (n + 1) :=  @Nat.nth_strictMono (fun (x : Nat) => a.F (r.f x)) (fair_infinite a r r_fair) n (n + 1) (by omega)
+  sorry
+
+theorem ranking_mono (r_fair : r.IsFair a) {m n : ℕ} : OrdSeq a r W m < OrdSeq a r W n ↔ n < m := by
+  apply StrictAnti.lt_iff_lt
+  apply strictAnti_nat_of_succ_lt
+  exact nth_succ a r W r_fair
+
+theorem Soundness3 (W : OrdinalRankingFunction.{u} a) : a.IsFairEmpty :=  by
+  intro r
+  by_contra r_fair
+  have x : ¬ WellFounded LT.lt := RelEmbedding.not_wellFounded_of_decreasing_seq ⟨⟨fun n => W.V (r.f (nth_visit a r n)),
+    by
+      apply StrictAnti.injective
+      apply strictAnti_nat_of_succ_lt
+      exact nth_succ a r W r_fair
+      ⟩, by
+        intros m n
+        simp only [Function.Embedding.coeFn_mk, gt_iff_lt]
+        exact ranking_mono a r W r_fair⟩
+  exact x (Ordinal.wellFoundedLT.{u}.wf)
