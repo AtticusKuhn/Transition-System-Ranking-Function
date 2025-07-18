@@ -27,7 +27,7 @@ jobs:
 
       - name: Generate docs 📜
         run: |
-          ./docgen.sh
+          bash ./docgen.sh
 
 # stolen from mathlib: https://github.com/leanprover-community/mathlib4_docs/blob/1f4ea7657bc377b4298fd400e567471d3a248b2d/.github/workflows/docs.yaml#L79-L86
       - name: Upload artifact 📁
