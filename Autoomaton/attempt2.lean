@@ -86,7 +86,7 @@ lemma rank_plus_fairCount_le_rank_zero (y : Nat) : V.rank (r.f y) + fairCount r 
   induction' y with i ih
   · simp only [fairCount, Nat.count_zero, add_zero, le_refl]
   · simp only [Nat.count_succ, fairCount] at *
-    have n : V.rank (r.f (i + 1)) + (if a.F (r.f i) then 1 else 0) ≤ V.rank (r.f i) := V.rank_le_of_rel (r.f i) (r.f (i + 1)) (r.is_valid i)
+    have : V.rank (r.f (i + 1)) + (if a.F (r.f i) then 1 else 0) ≤ V.rank (r.f i) := V.rank_le_of_rel (r.f i) (r.f (i + 1)) (r.is_valid i)
     omega
 
 /-- The number of fair visits up to any time `y` is bounded by the rank of the initial state.
