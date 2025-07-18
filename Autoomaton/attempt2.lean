@@ -15,21 +15,21 @@ import Mathlib.Order.OrderIsoNat
 -/
 structure Automaton (S : Type) where
   /-- The transition relation $R \subseteq S \times S$. -/
-  (R : S → S → Bool)
+  R : S → S → Bool
   /-- The set of initial states $I \subseteq S$. -/
-  (I : S → Bool)
+  I : S → Bool
   /-- The set of fair (accepting) states $F \subseteq S$. -/
-  (F : S → Bool)
+  F : S → Bool
 
 /-- A run of a Büchi automaton is an infinite sequence of states $f : \mathbb{N} \to S$ such that
 the first state is initial and all subsequent states are related by the transition relation. -/
 structure Run {S : Type} (a : Automaton S) where
   /-- The infinite sequence of states $f : \mathbb{N} \to S$. -/
-  (f : Nat → S)
+  f : Nat → S
   /-- The first state must be an initial state, i.e., $f(0) \in I$. -/
-  (is_init : a.I (f 0))
+  is_init : a.I (f 0)
   /-- Each consecutive pair of states must be in the transition relation, i.e., $\forall n \in \mathbb{N}, (f(n), f(n+1)) \in R$. -/
-  (is_valid : ∀ n, a.R (f n) (f n.succ))
+  is_valid : ∀ n, a.R (f n) (f n.succ)
 
 variable {S : Type} {a : Automaton S} (r : Run a)
 
@@ -148,10 +148,10 @@ This is a more general form of a ranking function.
 -/
 structure OrdinalRankingFunction {S : Type} (a : Automaton S) : Type (u + 1) where
   /-- The ranking function $W: S \to \text{Ordinal}$. -/
-  (rank : S → Ordinal.{u})
+  rank : S → Ordinal.{u}
   /-- The condition on the ranking function: for all transitions $(s_1, s_2) \in R$,
   $W(s_2) + \mathbb{I}(s_1 \in F) \le W(s_1)$, where $\mathbb{I}$ is the indicator function. -/
-  (rank_le_of_rel : ∀ s1 s2, a.R s1 s2 → rank s2 + (if a.F s1 then 1 else 0) ≤ rank s1)
+  rank_le_of_rel : ∀ s1 s2, a.R s1 s2 → rank s2 + (if a.F s1 then 1 else 0) ≤ rank s1
 
 variable (W : OrdinalRankingFunction a)
 
