@@ -8,13 +8,13 @@ import Mathlib.SetTheory.Ordinal.Basic
 import Mathlib.Order.OrderIsoNat
 
 /-- A Büchi automaton. -/
-structure Automaton (S : Type) :=
+structure Automaton (S : Type) where
   (R : S → S → Bool)
   (I : S → Bool)
   (F : S → Bool)
 
 /-- A run of a Büchi automaton. -/
-structure Run {S : Type} (a : Automaton S) :=
+structure Run {S : Type} (a : Automaton S) where
   (f : Nat → S)
   (is_init : a.I (f 0))
   (is_valid : ∀ n, a.R (f n) (f n.succ))
@@ -34,7 +34,7 @@ def Run.IsFairEmpty : Prop := r.IsUnfair
 def Automaton.IsFairEmpty : Prop := ∀ (r : Run a), r.IsFairEmpty
 
 /-- A ranking function from states to natural numbers. -/
-structure RankingFunction {S : Type} (a : Automaton S) :=
+structure RankingFunction {S : Type} (a : Automaton S) where
   (rank : S → Nat)
   (rank_le_of_rel : ∀ s1 s2, a.R s1 s2 → rank s2 + (if a.F s1 then 1 else 0) ≤ rank s1)
 
@@ -50,7 +50,7 @@ noncomputable def nth_visit (n : Nat) : Nat := Nat.nth (fun m => a.F (r.f m)) n
 
 lemma rank_plus_fairCount_le_rank_zero (y : Nat) : V.rank (r.f y) + fairCount r y ≤ V.rank (r.f 0) := by
   induction' y with i ih
-  · simp only [Nat.count_zero, add_zero, le_refl]
+  · simp only [fairCount, Nat.count_zero, add_zero, le_refl]
   · simp only [Nat.count_succ, fairCount] at *
     have n : V.rank (r.f (i + 1)) + (if a.F (r.f i) then 1 else 0) ≤ V.rank (r.f i) := V.rank_le_of_rel (r.f i) (r.f (i + 1)) (r.is_valid i)
     omega
@@ -82,35 +82,23 @@ noncomputable def fairVisitsFinset (V : RankingFunction a) : Finset ℕ := Set.F
 theorem isFairEmpty_of_rankingFunction (V : RankingFunction a) : a.IsFairEmpty :=  by
   intro r
   by_contra r_fair
+  simp [Run.IsFairEmpty] at r_fair
   by_cases empty : (fairVisitsFinset r V) = ∅
-  · simp only [Set.Finite.toFinset_eq_empty] at empty
+  · simp only [Set.Finite.toFinset_eq_empty, fairVisitsFinset] at empty
     rcases (r_fair 0) with ⟨x, _, x_fair⟩
     have x_mem_s : x ∈ fairVisits r := by
-      simp only [Set.mem_setOf_eq, x_fair]
+      exact x_fair
     simp only [empty, Set.mem_empty_iff_false] at x_mem_s
   · rcases r_fair (Finset.max' (fairVisitsFinset r V) (Finset.nonempty_of_ne_empty empty)) with ⟨x, x_gt_max, x_fair⟩
-    simp only [Finset.max'_lt_iff, Set.Finite.mem_toFinset, Set.mem_setOf_eq] at x_gt_max
+    simp only [fairVisitsFinset, fairVisits, Finset.max'_lt_iff, Set.Finite.mem_toFinset,
+      Set.mem_setOf_eq] at x_gt_max
     have x_lt_x : x < x := x_gt_max x x_fair
     omega
-
-theorem isFairEmpty_of_rankingFunction' (V : RankingFunction a) : a.IsFairEmpty :=  by
-  intro r
-  by_contra r_fair
-  have empty : fairVisitsFinset r V ≠ ∅ := by
-    intro e
-    simp only [Set.Finite.toFinset_eq_empty] at e
-    rcases (r_fair 0) with ⟨x, _, x_fair⟩
-    apply Set.notMem_empty x
-    simp only [← e, fairVisits, Set.mem_setOf_eq, x_fair]
-  rcases r_fair (Finset.max' (fairVisitsFinset r V) (Finset.nonempty_of_ne_empty empty)) with ⟨x, x_gt_max, x_fair⟩
-  simp only [Finset.max'_lt_iff, Set.Finite.mem_toFinset] at x_gt_max
-  have x_lt_x : x < x := x_gt_max x x_fair
-  omega
 
 universe u
 
 /-- A ranking function from states to ordinals. -/
-structure OrdinalRankingFunction {S : Type} (a : Automaton S) : Type (u + 1) :=
+structure OrdinalRankingFunction {S : Type} (a : Automaton S) : Type (u + 1) where
   (rank : S → Ordinal.{u})
   (rank_le_of_rel : ∀ s1 s2, a.R s1 s2 → rank s2 + (if a.F s1 then 1 else 0) ≤ rank s1)
 
