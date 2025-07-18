@@ -181,26 +181,26 @@ theorem rank_antitone : Antitone (fun n => W.rank (r.f n)) := antitone_nat_of_su
 
 /-- For a fair run, the sequence of ranks at fair visits is strictly decreasing.
 $W(r.f(\text{nth_visit}(r, n+1))) < W(r.f(\text{nth_visit}(r, n)))$. -/
-theorem ordSeq_strict_anti (r_fair : r.IsFair) (n : ℕ) : ordSeq r W (n + 1) < ordSeq r W n := by
+theorem ordSeq_strict_anti (r_fair : r.IsFair) : StrictAnti (ordSeq r W) := strictAnti_nat_of_succ_lt (fun n => by
   have : nth_visit r n < nth_visit r (n + 1) :=  @Nat.nth_strictMono (fun (x : Nat) => a.F (r.f x)) (fair_infinite r r_fair) n (n + 1) (by omega)
   have y := W.rank_le_of_rel (r.f (nth_visit r n)) (r.f (nth_visit r (n) + 1)) (r.is_valid (nth_visit r n))
   simp only [is_fair_at_nth_visit r n r_fair, ↓reduceIte, Ordinal.add_one_eq_succ,
     Order.succ_le_iff] at y
   exact LE.le.trans_lt (by
     apply rank_antitone
-    omega) y
+    omega) y)
 
 /-- The comparison of ranks in the `ordSeq` is equivalent to the reversed comparison of their indices.
 This is a property of strictly antitone sequences.
 For $m, n \in \mathbb{N}$, $W(r.f(\text{nth_visit}(r, m))) < W(r.f(\text{nth_visit}(r, n))) \iff n < m$. -/
-theorem ordSeq_lt_iff_lt (r_fair : r.IsFair) {m n : ℕ} : ordSeq r W m < ordSeq r W n ↔ n < m := StrictAnti.lt_iff_lt (strictAnti_nat_of_succ_lt (ordSeq_strict_anti r W r_fair))
+theorem ordSeq_lt_iff_lt (r_fair : r.IsFair) {m n : ℕ} : ordSeq r W m < ordSeq r W n ↔ n < m := StrictAnti.lt_iff_lt (ordSeq_strict_anti r W r_fair)
 
 /-- The main theorem for ordinal-valued ranking functions.
 If an ordinal-valued ranking function `W` exists for an automaton `a`, then `a` has no fair runs.
 This is proven by showing that a fair run would imply an infinite decreasing sequence of ordinals, which is impossible. -/
 theorem isFairEmpty_of_ordinalRankingFunction (W : OrdinalRankingFunction.{u} a) : a.IsFairEmpty := fun r r_fair =>
   (RelEmbedding.not_wellFounded_of_decreasing_seq ⟨⟨ordSeq r W,
-      StrictAnti.injective (strictAnti_nat_of_succ_lt (ordSeq_strict_anti r W r_fair))
+      StrictAnti.injective (ordSeq_strict_anti r W r_fair)
       ⟩, by
         intros m n
         simp only [Function.Embedding.coeFn_mk, gt_iff_lt]
