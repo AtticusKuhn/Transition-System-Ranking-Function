@@ -225,7 +225,20 @@ def stateSucceeds {S : Type} (a : Automaton S) (s2 s1 : S) : Prop :=
 --       sorry ⟩
 
 -- theorem succeeds_wf_2 (a : Automaton S)   (fe : a.IsFairEmpty) : WellFounded (suceeds a) :=
+-- s1_r_s2 : a.R s1 s2
+-- s : Ordinal.{0}
+-- n : S
+-- n_suc_s2 : stateSucceeds a n s2
+-- ord_suc : Order.succ (IsWellFounded.rank (stateSucceeds a) n) = s
+-- ⊢ stateSucceeds a n s1
 
+theorem succeeds_concat { S : Type} (s1 s2 n : S)  (a : Automaton S)  (s1_r_s2 : a.R s1 s2) (n_suc_s2 : stateSucceeds a n s2) : stateSucceeds a n s1 := by
+  rcases n_suc_s2 with ⟨ f, rt, f_fair, tg ⟩
+  use f
+  simp [f_fair, tg]
+  rw [Relation.ReflTransGen.cases_head_iff]
+  right
+  use s2
 
 theorem succeeds_wf (a : Automaton S) (fe : a.IsFairEmpty) : WellFounded (stateSucceeds a) := by
   -- simp [IsWellFounded]
@@ -261,82 +274,50 @@ theorem isFairEmpty_of_ordinalRankingFunction (W : OrdinalRankingFunction.{0} a)
         exact ordSeq_lt_iff_lt r W r_fair⟩) (Ordinal.wellFoundedLT.{0}.wf)
 
 
-  -- sorry
 
-
--- def step {X : Type} (r : X → X → Prop) [hwf : IsWellFounded X r] (o : Ordinal.{0}) : X := by sorry
-
-
-noncomputable def vardi {S : Type} (a : Automaton S) (ne : Inhabited S) (fe : a.IsFairEmpty) (o : Ordinal.{0}) : S := by
-  by_cases ne2 : { s : S | ∀ (o1 : Ordinal.{0}), o1 < o → s ≠ vardi a ne fe o1 }.Nonempty
-  · exact WellFounded.min (succeeds_wf a fe) { s : S | ∀ (o1 : Ordinal.{0}), o1 < o → s ≠ vardi a ne fe o1 } ne2
-  · exact ne.default
-termination_by o
-
-noncomputable def rev_vardi {S : Type} (a : Automaton S) (ne : Inhabited S) (fe : a.IsFairEmpty) (s : S) : Ordinal.{0} := by
-  exact WellFounded.min (Ordinal.wellFoundedLT.{0}.wf) {o :  Ordinal.{0} | vardi a ne fe o = s } (by
-    -- induction' o using Ordinal.induction with i IH
-    sorry)
-termination_by o
--- theorem rank_lt_of_rel {(h : r a b) : rank r a < rank r b :=
-  -- Acc.rank_lt_of_rel _ h
-theorem rev_rank {α : Type} {a b : α} {r : α → α → Prop} [hwf : IsWellFounded α r] :  IsWellFounded.rank r a ≥  IsWellFounded.rank r b →  ¬ (r a b)
-   := by
-    contrapose
-    simp only [not_not, ge_iff_le, not_le]
-    exact IsWellFounded.rank_lt_of_rel
-
-theorem rev_rank2 {α : Type} {a b : α} {r : α → α → Prop} [hwf : IsWellFounded α r] :  IsWellFounded.rank r a ≤  IsWellFounded.rank r b →  Relation.ReflTransGen r a b
-   := by
-    intro a_lt_b
-    rw [IsWellFounded.rank_eq] at a_lt_b
-    rw [IsWellFounded.rank_eq] at a_lt_b
-    -- rw [lt_sSup_iff ]
-    simp [iSup] at a_lt_b
-    -- repeat rw [sSup_range] at a_lt_b
-    -- rw [sSup_le_iff (s := )] at a_lt_b
-    -- rw [lt_sSup_iff (b := sSup (Set.range fun b ↦ Order.succ (IsWellFounded.rank r ↑b)) )] at a_lt_b
-    -- induction' (IsWellFounded.rank r b - IsWellFounded.rank r a) using Ordinal.induction with i IH
-    -- ?have x := IH 0
-
-    sorry
-
-noncomputable def completeness (fe : a.IsFairEmpty) : OrdinalRankingFunction.{0} a := by
-  -- simp at fe
-  exact ⟨@IsWellFounded.rank  S (stateSucceeds a) (n a fe), fun s1 s2  rel => by
+noncomputable def completeness (fe : a.IsFairEmpty) : OrdinalRankingFunction.{0} a := ⟨@IsWellFounded.rank S (stateSucceeds a) (n a fe), fun s1 s2  rel => by
     intro s1_fair
-    have x : (stateSucceeds a s2 s1) := by
-      use s1
-      simp [s1_fair]
-      rw [Relation.ReflTransGen.cases_tail_iff]
-      rw [Relation.transGen_iff]
-      simp [rel]
-
-    exact IsWellFounded.rank_lt_of_rel (hwf := n a fe) x
-    ,
+    apply IsWellFounded.rank_lt_of_rel (hwf := n a fe)
+    use s1
+    rw [Relation.ReflTransGen.cases_tail_iff]
+    rw [Relation.transGen_iff]
+    simp only [s1_fair, true_and, true_or, rel, and_self],
     by
     intros s1 s2 s1_r_s2
     by_contra c
-    simp at c
-    have thing :  IsWellFounded.rank (hwf := n a fe) (stateSucceeds a) s2 ≥ IsWellFounded.rank (hwf := n a fe) (stateSucceeds a) s1  := by
-      sorry
-    have thing2 : IsWellFounded.rank  (hwf := n a fe) (stateSucceeds a) s1 ≤  IsWellFounded.rank (hwf := n a fe)  (stateSucceeds a) s2 := by
+    simp only [not_le] at c
+    rw [IsWellFounded.rank_eq] at c
+    rw [IsWellFounded.rank_eq] at c
+    have :  sSup (Set.range fun (b : { b // stateSucceeds a b s2 }) ↦ Order.succ (IsWellFounded.rank (hwf := n a fe) (stateSucceeds a) ↑b)) ≤ sSup (Set.range fun (b : { b // stateSucceeds a b s1 }) ↦ Order.succ (IsWellFounded.rank (hwf := n a fe) (stateSucceeds a) ↑b)) := csSup_le_csSup (by
+      simp [BddAbove, upperBounds, Set.Nonempty]
+      use IsWellFounded.rank (hwf := n a fe) (stateSucceeds a) s1
+      intros s3 s3_suc_s1
+      exact IsWellFounded.rank_lt_of_rel (hwf := n a fe) s3_suc_s1)
+      (by
+        by_cases n : (∃ (f : S), stateSucceeds a f s2 )
+        · rcases n with  ⟨f, f_suc_s2 ⟩
+          have nonempt : Nonempty { b // stateSucceeds a b s2 } := by
+            use f
+          apply Set.range_nonempty (h := nonempt)
+        · simp only [not_exists] at n
+          have : IsEmpty { b // stateSucceeds a b s2 } := ⟨ fun ⟨ a, a_succ ⟩  => n a a_succ⟩
+          simp only [ciSup_of_empty, Ordinal.bot_eq_zero] at c
+          simp only [Ordinal.not_lt_zero] at c
+          )
+      (by
+        intro s s_in_b
+        simp only [Set.mem_range, Subtype.exists, exists_prop] at s_in_b
+        rcases s_in_b with ⟨ n, n_suc_s2, ord_suc⟩
+        simp
+        use n
+        simp only [ord_suc, and_true]
+        exact succeeds_concat s1 s2 n a s1_r_s2 n_suc_s2
+        )
+    have := LT.lt.not_ge c
+    contradiction
+    ⟩
 
-      sorry
-    have no_succeeds : ¬ (stateSucceeds a s2 s1) := by
-      sorry
-
-    have gh := IsWellFounded.mem_range_rank_of_le (hwf := n a fe) thing2
-    simp at gh
-    have y := rev_rank (hwf := n a fe) thing
-    simp [stateSucceeds] at y
-    have g := y s1
-    -- exact g rel s1_r_s2
-    rw [Relation.ReflTransGen.cases_tail_iff] at g
-    rw [Relation.transGen_iff] at g
-    simp [s1_r_s2] at g
-    sorry ⟩
-
+#print axioms completeness
 
 def ackStep (p : (Nat × List Nat)) : (Nat × List Nat) :=
   match p with
