@@ -6,6 +6,13 @@ import Mathlib.Order.Interval.Finset.Nat
 import Mathlib.Data.Nat.Nth
 import Mathlib.SetTheory.Ordinal.Basic
 import Mathlib.Order.OrderIsoNat
+import Mathlib.Computability.Ackermann
+import Mathlib.SetTheory.Ordinal.Notation
+import Mathlib.SetTheory.Ordinal.NaturalOps
+import Mathlib.SetTheory.Ordinal.Rank
+import Mathlib.SetTheory.Ordinal.Arithmetic
+
+set_option pp.universes true in
 
 /-- A Büchi automaton is a tuple $(S, R, I, F)$ where
 - $S$ is a set of states.
@@ -15,7 +22,7 @@ import Mathlib.Order.OrderIsoNat
 -/
 structure Automaton (S : Type) where
   /-- The transition relation $R \subseteq S \times S$. -/
-  R : S → S → Bool
+  R : S → S → Prop
   /-- The set of initial states $I \subseteq S$. -/
   I : S → Bool
   /-- The set of fair (accepting) states $F \subseteq S$. -/
@@ -127,7 +134,8 @@ If a ranking function `V` exists for an automaton `a`, then `a` has no fair runs
 theorem isFairEmpty_of_rankingFunction (V : RankingFunction a) : a.IsFairEmpty :=  by
   intro r
   by_contra r_fair
-  simp [Run.IsFairEmpty] at r_fair
+  simp only [Run.IsFairEmpty, Run.IsUnfair, Run.IsFair, gt_iff_lt, not_forall, not_exists, not_and,
+    Bool.not_eq_true, Classical.not_imp, Bool.not_eq_false] at r_fair
   by_cases empty : (fairVisitsFinset r V) = ∅
   · simp only [Set.Finite.toFinset_eq_empty, fairVisitsFinset] at empty
     rcases (r_fair 0) with ⟨x, _, x_fair⟩
@@ -151,7 +159,8 @@ structure OrdinalRankingFunction {S : Type} (a : Automaton S) : Type (u + 1) whe
   rank : S → Ordinal.{u}
   /-- The condition on the ranking function: for all transitions $(s_1, s_2) \in R$,
   $W(s_2) + \mathbb{I}(s_1 \in F) \le W(s_1)$, where $\mathbb{I}$ is the indicator function. -/
-  rank_le_of_rel : ∀ s1 s2, a.R s1 s2 → rank s2 + (if a.F s1 then 1 else 0) ≤ rank s1
+  rank_le_of_rel_fair : ∀ s1 s2, a.R s1 s2 → a.F s1  → rank s2 < rank s1
+  rank_le_of_rel_unfair : ∀ s1 s2, a.R s1 s2 → rank s2 ≤ rank s1
 
 variable (W : OrdinalRankingFunction a)
 
@@ -173,35 +182,416 @@ theorem is_fair_at_nth_visit (n : Nat) (r_fair : r.IsFair) : a.F (r.f (nth_visit
 /-- The sequence of ranks along a run is antitone (non-increasing).
 The function $n \mapsto W(r.f(n))$ is an antitone function from $\mathbb{N}$ to the ordinals. -/
 theorem rank_antitone : Antitone (fun n => W.rank (r.f n)) := antitone_nat_of_succ_le (fun n => by
-  have c := W.rank_le_of_rel (r.f n) (r.f (n + 1)) (r.is_valid n)
+  have cf := W.rank_le_of_rel_fair (r.f n) (r.f (n + 1)) (r.is_valid n)
+  have cu := W.rank_le_of_rel_unfair (r.f n) (r.f (n + 1)) (r.is_valid n)
   by_cases is_fair : a.F (r.f n)
-  <;> simp only [is_fair, ↓reduceIte, Ordinal.add_one_eq_succ, Order.succ_le_iff, Bool.false_eq_true, add_zero] at c
-  · exact LT.lt.le c
-  · exact c)
+  <;> simp only [is_fair, ↓reduceIte, Ordinal.add_one_eq_succ, Order.succ_le_iff, Bool.false_eq_true, add_zero] at cf
+  · exact LT.lt.le (W.rank_le_of_rel_fair (r.f n) (r.f (n + 1)) (r.is_valid n) is_fair)
+  · exact cu)
 
 /-- For a fair run, the sequence of ranks at fair visits is strictly decreasing.
 $W(r.f(\text{nth_visit}(r, n+1))) < W(r.f(\text{nth_visit}(r, n)))$. -/
 theorem ordSeq_strict_anti (r_fair : r.IsFair) : StrictAnti (ordSeq r W) := strictAnti_nat_of_succ_lt (fun n => by
   have : nth_visit r n < nth_visit r (n + 1) :=  @Nat.nth_strictMono (fun (x : Nat) => a.F (r.f x)) (fair_infinite r r_fair) n (n + 1) (by omega)
-  have y := W.rank_le_of_rel (r.f (nth_visit r n)) (r.f (nth_visit r (n) + 1)) (r.is_valid (nth_visit r n))
+  have yf := W.rank_le_of_rel_fair (r.f (nth_visit r n)) (r.f (nth_visit r (n) + 1)) (r.is_valid (nth_visit r n)) (is_fair_at_nth_visit r n r_fair)
+  have yu := W.rank_le_of_rel_unfair (r.f (nth_visit r n)) (r.f (nth_visit r (n) + 1)) (r.is_valid (nth_visit r n))
+
   simp only [is_fair_at_nth_visit r n r_fair, ↓reduceIte, Ordinal.add_one_eq_succ,
-    Order.succ_le_iff] at y
+    Order.succ_le_iff] at yf
   exact LE.le.trans_lt (by
     apply rank_antitone
-    omega) y)
+    omega) yf)
 
 /-- The comparison of ranks in the `ordSeq` is equivalent to the reversed comparison of their indices.
 This is a property of strictly antitone sequences.
 For $m, n \in \mathbb{N}$, $W(r.f(\text{nth_visit}(r, m))) < W(r.f(\text{nth_visit}(r, n))) \iff n < m$. -/
 theorem ordSeq_lt_iff_lt (r_fair : r.IsFair) {m n : ℕ} : ordSeq r W m < ordSeq r W n ↔ n < m := StrictAnti.lt_iff_lt (ordSeq_strict_anti r W r_fair)
 
+def stateSucceeds {S : Type} (a : Automaton S) (s2 s1 : S) : Prop :=
+  ∃ (f : S),
+  Relation.ReflTransGen a.R s1 f
+  ∧ a.F f
+  ∧ Relation.TransGen a.R f s2
+  -- ∧ f ≠ s1
+  -- ∃ (r : Run a), ∃ (i j k : Nat), i ≤ j ∧ j < k ∧ s1 = r.f i ∧ s2 = r.f k ∧ a.F (r.f j)
+-- theorem suceeds_trans {S : Type} (a : Automaton S) {s1 s2 s3: S} (suc1 : suceeds a s1 s2) (suc2 : suceeds a s2 s3) : suceeds a s2 s3 := by
+--   rcases suc1 with ⟨ r1, i1, j1, k1, c1⟩
+--   rcases suc2 with ⟨ r2, i2, j2, k2, c2 ⟩
+--   exact ⟨⟨ fun n => if n < k1 then r1.f n else r2.f n, by
+--     simp
+--     sorry, sorry⟩ , by
+--       simp
+
+--       sorry ⟩
+
+-- theorem succeeds_wf_2 (a : Automaton S)   (fe : a.IsFairEmpty) : WellFounded (suceeds a) :=
+
+
+theorem succeeds_wf (a : Automaton S) (fe : a.IsFairEmpty) : WellFounded (stateSucceeds a) := by
+  -- simp [IsWellFounded]
+  -- suggest
+  -- suggest_hint
+  simp [WellFounded.wellFounded_iff_no_descending_seq]
+  by_contra c
+  simp at c
+  simp at fe
+
+  rcases c with ⟨ s, y⟩
+  simp [stateSucceeds] at y
+
+  -- have rn : Run a := ⟨fun n => (Exists.choose (y n)).1 n
+  --   ,  (Exists.choose (y 0)).2
+
+  --    , sorry⟩
+  -- have := fe rn
+  sorry
+
+instance n {S  : Type } (a : Automaton S) (fe : a.IsFairEmpty) : IsWellFounded S (stateSucceeds a) where
+  wf := succeeds_wf a fe
+
 /-- The main theorem for ordinal-valued ranking functions.
 If an ordinal-valued ranking function `W` exists for an automaton `a`, then `a` has no fair runs.
 This is proven by showing that a fair run would imply an infinite decreasing sequence of ordinals, which is impossible. -/
-theorem isFairEmpty_of_ordinalRankingFunction (W : OrdinalRankingFunction.{u} a) : a.IsFairEmpty := fun r r_fair =>
+theorem isFairEmpty_of_ordinalRankingFunction (W : OrdinalRankingFunction.{0} a) : a.IsFairEmpty := fun r r_fair =>
   (RelEmbedding.not_wellFounded_of_decreasing_seq ⟨⟨ordSeq r W,
       StrictAnti.injective (ordSeq_strict_anti r W r_fair)
       ⟩, by
         intros m n
         simp only [Function.Embedding.coeFn_mk, gt_iff_lt]
-        exact ordSeq_lt_iff_lt r W r_fair⟩) (Ordinal.wellFoundedLT.{u}.wf)
+        exact ordSeq_lt_iff_lt r W r_fair⟩) (Ordinal.wellFoundedLT.{0}.wf)
+
+
+  -- sorry
+
+
+-- def step {X : Type} (r : X → X → Prop) [hwf : IsWellFounded X r] (o : Ordinal.{0}) : X := by sorry
+
+
+noncomputable def vardi {S : Type} (a : Automaton S) (ne : Inhabited S) (fe : a.IsFairEmpty) (o : Ordinal.{0}) : S := by
+  by_cases ne2 : { s : S | ∀ (o1 : Ordinal.{0}), o1 < o → s ≠ vardi a ne fe o1 }.Nonempty
+  · exact WellFounded.min (succeeds_wf a fe) { s : S | ∀ (o1 : Ordinal.{0}), o1 < o → s ≠ vardi a ne fe o1 } ne2
+  · exact ne.default
+termination_by o
+
+noncomputable def rev_vardi {S : Type} (a : Automaton S) (ne : Inhabited S) (fe : a.IsFairEmpty) (s : S) : Ordinal.{0} := by
+  exact WellFounded.min (Ordinal.wellFoundedLT.{0}.wf) {o :  Ordinal.{0} | vardi a ne fe o = s } (by
+    -- induction' o using Ordinal.induction with i IH
+    sorry)
+termination_by o
+-- theorem rank_lt_of_rel {(h : r a b) : rank r a < rank r b :=
+  -- Acc.rank_lt_of_rel _ h
+theorem rev_rank {α : Type} {a b : α} {r : α → α → Prop} [hwf : IsWellFounded α r] :  IsWellFounded.rank r a ≥  IsWellFounded.rank r b →  ¬ (r a b)
+   := by
+    contrapose
+    simp only [not_not, ge_iff_le, not_le]
+    exact IsWellFounded.rank_lt_of_rel
+
+theorem rev_rank2 {α : Type} {a b : α} {r : α → α → Prop} [hwf : IsWellFounded α r] :  IsWellFounded.rank r a ≤  IsWellFounded.rank r b →  Relation.ReflTransGen r a b
+   := by
+    intro a_lt_b
+    rw [IsWellFounded.rank_eq] at a_lt_b
+    rw [IsWellFounded.rank_eq] at a_lt_b
+    -- rw [lt_sSup_iff ]
+    simp [iSup] at a_lt_b
+    -- repeat rw [sSup_range] at a_lt_b
+    -- rw [sSup_le_iff (s := )] at a_lt_b
+    -- rw [lt_sSup_iff (b := sSup (Set.range fun b ↦ Order.succ (IsWellFounded.rank r ↑b)) )] at a_lt_b
+    -- induction' (IsWellFounded.rank r b - IsWellFounded.rank r a) using Ordinal.induction with i IH
+    -- ?have x := IH 0
+
+    sorry
+
+noncomputable def completeness (fe : a.IsFairEmpty) : OrdinalRankingFunction.{0} a := by
+  -- simp at fe
+  exact ⟨@IsWellFounded.rank  S (stateSucceeds a) (n a fe), fun s1 s2  rel => by
+    intro s1_fair
+    have x : (stateSucceeds a s2 s1) := by
+      use s1
+      simp [s1_fair]
+      rw [Relation.ReflTransGen.cases_tail_iff]
+      rw [Relation.transGen_iff]
+      simp [rel]
+
+    exact IsWellFounded.rank_lt_of_rel (hwf := n a fe) x
+    ,
+    by
+    intros s1 s2 s1_r_s2
+    by_contra c
+    simp at c
+    have thing :  IsWellFounded.rank (hwf := n a fe) (stateSucceeds a) s2 ≥ IsWellFounded.rank (hwf := n a fe) (stateSucceeds a) s1  := by
+      sorry
+    have thing2 : IsWellFounded.rank  (hwf := n a fe) (stateSucceeds a) s1 ≤  IsWellFounded.rank (hwf := n a fe)  (stateSucceeds a) s2 := by
+
+      sorry
+    have no_succeeds : ¬ (stateSucceeds a s2 s1) := by
+      sorry
+
+    have gh := IsWellFounded.mem_range_rank_of_le (hwf := n a fe) thing2
+    simp at gh
+    have y := rev_rank (hwf := n a fe) thing
+    simp [stateSucceeds] at y
+    have g := y s1
+    -- exact g rel s1_r_s2
+    rw [Relation.ReflTransGen.cases_tail_iff] at g
+    rw [Relation.transGen_iff] at g
+    simp [s1_r_s2] at g
+    sorry ⟩
+
+
+def ackStep (p : (Nat × List Nat)) : (Nat × List Nat) :=
+  match p with
+  | (n, []) => (n, [])
+  | (n, 0 :: c) => ((n + 1), c)
+  | (0, (m + 1) :: c) =>  (1, m :: c)
+  | (n + 1, (m + 1) :: c) => (n, (m + 1) :: m :: c)
+
+-- def ackMax (p : Nat × List Nat) :  Nat  := match p with
+--   | (x, []) => x
+--   | (x, y :: ys) => ackMax (ack x y, ys)
+
+def ackMax2 (x : Nat) (y : List Nat) :  Nat  := match y with
+  | [] => x
+  | y :: ys => ackMax2 (ack y x) ys
+
+
+
+
+theorem ack_gt_4 (m a b: Nat) (le : a ≤ b): ack m a ≤ ack m b :=
+  match m with
+    | 0 => by
+      simp only [ack_zero, add_le_add_iff_right, le]
+    | m + 1 => by
+      simp only [ack_le_iff_right, le]
+
+def ack_gt_2 (m n: Nat) (le : 1 ≤ m) : m + n ≤ ack m n :=
+  match m, n with
+    | 0, n => by
+      simp only [zero_add, ack_zero, le_add_iff_nonneg_right, zero_le]
+    | m + 1, 0 => by
+      simp only [add_zero, ack_succ_zero]
+      match (Nat.decEq m 0) with
+        | isTrue h =>  simp only [h, zero_add, ack_zero, Nat.reduceAdd, Nat.one_le_ofNat]
+        | isFalse _ => exact ack_gt_2 m 1 (by omega);
+    | m + 1, n + 1 =>
+      match (Nat.decEq m 0) with
+        | isTrue h => by
+          simp only [h, zero_add, ack_succ_succ, ack_one, ack_zero]
+          omega
+        | isFalse _ => by
+          have := ack_gt_2 m (m + 1 + n) (by omega);
+          have := ack_gt_4 m (m + 1 + n) (ack (m + 1) n) (ack_gt_2 (m + 1) n le);
+          simp only [ack_succ_succ, ge_iff_le]
+          omega
+termination_by (m, n)
+
+#print axioms ack_gt_2
+
+def ack_gt_5 (m n: Nat) : m + n ≤ ack m n := by
+  by_cases h : m = 0
+  simp only [h, zero_add, ack_zero, le_add_iff_nonneg_right, zero_le]
+  have := ack_gt_2 m n (by omega)
+  omega
+
+theorem ack_gt_1 (m n: Nat) : n ≤ ack m n := by
+  have := ack_gt_5 m n
+  omega
+
+theorem ackMax2_gt (x : Nat) (y : List Nat)  : x ≤ ackMax2 x y :=
+  match y with
+    | [] => by simp only [ackMax2, le_refl]
+    | y :: ys => by
+      simp only [ackMax2]
+      have := ack_gt_1 y x
+      have := ackMax2_gt (ack y x) ys
+      omega
+
+-- theorem ack_gt (n m: Nat) : ack m n ≥ n :=
+--   match m, n with
+--     | 0, n => by
+--       simp
+--     | m + 1, 0 => by
+--       simp
+--     | m + 1, n + 1 => by
+--       simp [ack]
+--       sorry
+
+-- theorem ackMax_gt (n : Nat) (l  : List Nat) : ackMax2 n l ≥ n :=
+--   match l with
+--     | [] => by simp only [ackMax2, ge_iff_le, le_refl]
+--     | y :: ys => by
+--       simp [ackMax2]
+--       have re := ackMax_gt (ack y n) ys
+
+--       sorry
+
+def ackMax (p : Nat × List Nat) : Nat := match p with
+  | (x, ys) => ackMax2 x ys
+
+def AckSystem : Automaton (Nat × List Nat) where
+  R := fun a b => b = ackStep a
+  I := fun ⟨_, y⟩  => y.length = 1
+  F := fun ⟨_, y⟩ => y ≠ []
+
+-- def ackRankf (p : Nat × List Nat) : Ordinal :=
+--   match p with
+--   | ⟨ x,  y⟩ => let m : Nat := ackMax (x, y)
+--   (@y.foldrIdx Nat Ordinal (fun i b a => a + b * Ordinal.omega0 ^ (m - i)) Ordinal.zero.zero 0) + (m - x)
+def ackRankf (p : Nat × List Nat) : Ordinal :=
+  match p with
+  | ⟨n, l⟩ =>
+    let m : Nat := ackMax (n, l)
+    let p : Ordinal := List.sum (@l.reverse.mapIdx Nat Ordinal (fun i a =>  a * Ordinal.omega0 ^ (m - i)))
+    -- let p : OrdiniSupal := List.sum (@l.mapIdx Nat Ordinal (fun i a =>  a * Ordinal.omega0 ^ (m - l.length + 1 + i)))
+    -- let p : Ordinal := @l.foldlIdx Ordinal Nat (fun i a b => b +  a * Ordinal.omega0 ^ (m - i)) (Ordinal.zero.zero) 0
+    -- let p : Ordinal := @l.foldrIdx Nat Ordinal (fun i a b => b +  a * Ordinal.omega0 ^ (m - i)) (Ordinal.zero.zero) 0
+
+    p + (m - n)
+
+
+def test1 : Ordinal := ackRankf ⟨2, [2]⟩
+def test2 : Nat := ackMax ⟨ 4, [1]⟩
+def test3 : Nat := ackMax ⟨ 3, [2,1]⟩
+def test4 : Nat := ackMax ⟨ 2, [2, 1, 1]⟩
+
+-- ackMax2
+-- #eval test2
+-- #eval test3
+-- #eval test4
+#eval (ack 2 4)
+#eval (ack 1 (ack 2 3))
+#eval (ack 1 (ack 1 (ack 2 2)))
+#eval (ackMax2 4 [2])
+#eval (ackMax2 3 [2, 1])
+-- #eval (ackRankf ⟨ 2, [2, 1, 1]⟩)
+
+theorem t1 : ackRankf ⟨ 2, [2, 1, 1]⟩ = Ordinal.omega0^11 + Ordinal.omega0^10 + 2 * Ordinal.omega0^9 + 9  := by
+  -- rfl
+  simp [ackRankf, ackMax, ackMax2]
+  -- rfl
+
+  sorry
+-- #reduce test1
+
+-- theorem ord_lt (m : Ordinal.{0}) (t : Ordinal.{0}) : m - Order.succ t < m - t := by
+--   sorry
+
+universe v
+theorem mapIdx_append {α : Type u} {β : Type v} {f : ℕ → α → β} {l : List α} {e r : α} : List.mapIdx f (l ++ [e, r]) = List.mapIdx f l ++ [f l.length e, f l.length.succ r] := by
+    rw [List.append_cons]
+    simp only [List.mapIdx_concat, List.length_append, List.length_cons, List.length_nil, zero_add,
+      List.nil_append, Nat.succ_eq_add_one]
+    simp
+
+theorem f  { n  : Nat}: (Order.succ n : Ordinal.{0}) = (Nat.succ n) := by
+  simp only [Nat.succ_eq_add_one, Nat.cast_add, Nat.cast_one, Ordinal.add_one_eq_succ]
+theorem g  { m n  : Nat}: (m : Ordinal.{0}) - (n : Ordinal.{0}) = (Nat.cast (m - n)) := by
+  simp
+theorem h  { m n  : Nat}:  (n : Ordinal.{0}) < m ↔ n < m := by
+  simp
+theorem h2  { m n  : Nat}:  (n : Ordinal.{0}) ≤  m ↔ n ≤  m := by
+  simp
+theorem ord_cmp {a1 a2 b1 b2 : Nat} : (a1 * Ordinal.omega0  + b1 <  a2 * Ordinal.omega0  + b2) ↔ (a1 < a2 ∨ (a1 = a2 ∧ b1 < b2)) := by
+  sorry
+  -- sorry
+noncomputable def ackRank : OrdinalRankingFunction.{0} AckSystem where
+  rank := ackRankf
+
+  rank_le_of_rel_fair := fun s1 s2 t =>
+   match s1 with
+      | (n, []) => by
+        simp [AckSystem, ackRankf, ackStep] at t
+        simp [t,AckSystem, ackRankf]
+      | (n, 0 :: c) => by
+        simp [AckSystem, ackRankf, ackStep] at t
+        simp only [ackRankf, ackMax, t, List.mapIdx_reverse, Nat.cast_add, Nat.cast_one,
+          Ordinal.add_one_eq_succ, AckSystem, ne_eq, decide_not, reduceCtorEq, decide_false,
+          Bool.not_false, ↓reduceIte, ackMax2, ack_zero, List.reverse_cons, List.mapIdx_concat,
+          Nat.cast_zero, List.length_reverse, zero_mul, List.sum_append, List.sum_cons,
+          List.sum_nil, add_zero, add_lt_add_iff_left]
+        simp
+        rw [f]
+        repeat rw [g]
+        rw [h]
+        simp [ackMax2]
+        have f := ackMax2_gt (n + 1) c
+        omega
+      | (0, (m + 1) :: c) =>  by
+        simp [AckSystem, ackRankf, ackStep] at t
+        simp [ackRankf, ackMax, t, ackMax2, List.reverse_cons, List.mapIdx_concat,
+          List.mapIdx_reverse, List.length_reverse, List.sum_append, List.sum_cons, List.sum_nil,
+          add_zero, Nat.cast_one, AckSystem, ne_eq, decide_not, reduceCtorEq, decide_false,
+          Bool.not_false, ↓reduceIte, Ordinal.add_one_eq_succ, ack_succ_zero, Nat.cast_add,
+          Nat.cast_zero, Ordinal.sub_zero, Order.succ_le_iff]
+        -- simp [​add_lt_add_iff_left]
+        -- simp [add_lt_add_iff_left]
+        -- let f: Ordinal.{0} := (List.mapIdx (fun i a ↦ ↑a * Ordinal.omega0 ^ (ackMax2 (ack m 1) c - (c.length - 1 - i))) c).reverse.sum
+        -- have feq : (f = (List.mapIdx (fun i a ↦ ↑a * Ordinal.omega0 ^ (ackMax2 (ack m 1) c - (c.length - 1 - i))) c).reverse.sum)  := by rfl
+        -- rw [← feq]
+        repeat rw [add_assoc]
+        simp
+        rw [f]
+        -- rw [@g (ackMax2 (n + 1) c) n.succ]
+        repeat rw [g,f, h]
+        -- rw [h]
+        -- simp [ackMax2]
+        -- apply add_lt_add_of_lt_of_le
+        -- linarith
+        -- omega
+        sorry
+      | (n + 1, (m + 1) :: c) => by
+        simp [AckSystem, ackRankf, ackStep] at t
+        simp [t,AckSystem, ackRankf, ackMax, ack, ackMax2]
+        rw [mapIdx_append]
+        simp
+        repeat rw [add_assoc]
+        simp
+        sorry
+
+  rank_le_of_rel_unfair := fun s1 s2 t =>
+   match s1 with
+      | (n, []) => by
+        simp [AckSystem, ackRankf, ackStep] at t
+        simp [t,AckSystem, ackRankf]
+      | (n, 0 :: c) => by
+        simp [AckSystem, ackRankf, ackStep] at t
+        simp only [ackRankf, ackMax, t, List.mapIdx_reverse, Nat.cast_add, Nat.cast_one,
+          Ordinal.add_one_eq_succ, AckSystem, ne_eq, decide_not, reduceCtorEq, decide_false,
+          Bool.not_false, ↓reduceIte, ackMax2, ack_zero, List.reverse_cons, List.mapIdx_concat,
+          Nat.cast_zero, List.length_reverse, zero_mul, List.sum_append, List.sum_cons,
+          List.sum_nil, add_zero, add_lt_add_iff_left]
+        simp
+        rw [f]
+        rw [@g (ackMax2 (n + 1) c) n.succ]
+        rw [@g (ackMax2 (n + 1) c) n]
+        rw [h2]
+        simp [ackMax2]
+        have f := ackMax2_gt (n + 1) c
+        omega
+        -- exact ord_lt (ackMax2 (n + 1) c) n
+      | (0, (m + 1) :: c) =>  by
+        simp [AckSystem, ackRankf, ackStep] at t
+        simp [ackRankf, ackMax, t, ackMax2, List.reverse_cons, List.mapIdx_concat,
+          List.mapIdx_reverse, List.length_reverse, List.sum_append, List.sum_cons, List.sum_nil,
+          add_zero, Nat.cast_one, AckSystem, ne_eq, decide_not, reduceCtorEq, decide_false,
+          Bool.not_false, ↓reduceIte, Ordinal.add_one_eq_succ, ack_succ_zero, Nat.cast_add,
+          Nat.cast_zero, Ordinal.sub_zero, Order.succ_le_iff]
+        -- simp [​add_lt_add_iff_left]
+        -- simp [add_lt_add_iff_left]
+        -- let f: Ordinal.{0} := (List.mapIdx (fun i a ↦ ↑a * Ordinal.omega0 ^ (ackMax2 (ack m 1) c - (c.length - 1 - i))) c).reverse.sum
+        -- have feq : (f = (List.mapIdx (fun i a ↦ ↑a * Ordinal.omega0 ^ (ackMax2 (ack m 1) c - (c.length - 1 - i))) c).reverse.sum)  := by rfl
+        -- rw [← feq]
+        repeat rw [add_assoc]
+        simp
+        -- apply add_lt_add_of_lt_of_le
+        -- linarith
+        sorry
+      | (n + 1, (m + 1) :: c) => by
+        simp [AckSystem, ackRankf, ackStep] at t
+        simp [t,AckSystem, ackRankf, ackMax, ack, ackMax2]
+        rw [mapIdx_append]
+        simp
+        repeat rw [add_assoc]
+        simp
+        sorry
+
+theorem ack_halts : AckSystem.IsFairEmpty := isFairEmpty_of_ordinalRankingFunction ackRank
