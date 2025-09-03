@@ -60,23 +60,6 @@ theorem fair_iff_fair2 : r.IsFair ↔ r.IsFair2 := by
     simp only [gt_iff_lt, fk, and_true]
     omega
 
-@[simp]
-def Run.IsFairN (n k : Nat) : Prop := n ≤ Nat.count (fun m => a.F (r.f m)) k
-
--- theorem Run.fairN_fair : (∀ (n : Nat), ∃ (k : Nat), r.IsFairN n k) ↔  r.IsFair := by
---   -- intro n
---   -- have y := p (n + 1)
---   -- simp [Run.IsFairN] at y
---   -- to_encard_tac
---   sorry
-
-
--- theorem Run.exists_fairN_fair : (∃ (r :Run a), ∀ (n : Nat), ∃ (k : Nat), r.IsFairN n k) ↔ ∃ (r :Run a), r.IsFair := by
---   simp only [Run.fairN_fair]
-
--- theorem Run.faex_exfa (p : (∀ (n : Nat), ∃ (r :Run a), ∃ (k : Nat),  r.IsFairN n k)) :  (∃ (r :Run a), ∀ (n : Nat),  ∃ (k : Nat), r.IsFairN n k) := by
-
---   sorry
 
 def State.IsReachable (s : S) : Prop :=
   -- ∃ (r : Run a), ∃ (i : Nat), r.f i = s
