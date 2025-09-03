@@ -72,19 +72,64 @@ def Path.head {R : S → S → Prop} {a b  c : S} (rel : R a b) (p : Path R b c 
   | .refl => Path.tail Path.refl rel
   | .tail b_to_b' path_b_to_b' => Path.tail (Path.head rel b_to_b') path_b_to_b'
 
+
+
+def Path.length {R : S → S → Prop} {a b : S} (p : Path R a b) : Nat :=
+  match p with
+    | @Path.refl S R a => 0
+    | @Path.tail S R a _ c snoc rel => 1 + Path.length snoc
+@[simp, reducible]
 def Path.lookup {R : S → S → Prop} {a b : S} (p : Path R a b) (i : Nat) : S :=
   match p with
     | @Path.refl S R a => a
-    | @Path.tail S R a _ c snoc rel =>
-      match i with
-        | 0 => a
-        | i + 1 => Path.lookup snoc i
+    | @Path.tail S R a b c snoc rel =>
+      if i >= p.length then c else snoc.lookup i
+def test : Path ( · < · ) 1 5 := Path.tail (c := 5) (
+    Path.tail (c := 3)
+      Path.refl (by omega)) (by omega)
+
+@[simp, reducible]
+def Path.toList {R : S → S → Prop} {a b : S} (p : Path R a b) : List S:=
+  match p with
+    | @Path.refl S R a => [a]
+    | @Path.tail S R a b c snoc rel => snoc.toList ++ [c]
+@[simp, reducible]
 def Path.lookup' {R : S → S → Prop} {a b : S} (p : Path R a b) (i : Nat) : S :=
-  match i with
-    | 0 => a
-    | i + 1 => match p with
-      | @Path.refl S R a => a
-      | @Path.tail S R a _ c snoc rel => Path.lookup' snoc i
+    List.getD (Path.toList p) i b
+  -- let rec go {R : S → S → Prop} {a b : S} (p : Path R a b) (l : Nat) (i : Nat) :=
+  --   match i with
+  --     | 0 => a
+  --     | i + 1 => match p with
+  --       | @Path.refl S R a => b
+  --       | @Path.tail S R a b c snoc rel =>
+  --         if i  >= p.length then c else go snoc l i
+  -- go p p.length i
+/-- info: 2 -/
+#guard_msgs in #eval test.length
+/-- info: 1 -/
+#guard_msgs in #eval test.lookup 0
+/-- info: 3 -/
+#guard_msgs in #eval test.lookup 1
+/-- info: 5 -/
+#guard_msgs in #eval test.lookup 2
+/-- info: 5 -/
+#guard_msgs in #eval test.lookup 3
+/-- info: 5 -/
+#guard_msgs in #eval test.lookup 4
+/-- info: 2 -/
+#guard_msgs in #eval test.length
+/-- info: 1 -/
+#guard_msgs in #eval test.lookup' 0
+/-- info: 3 -/
+#guard_msgs in #eval test.lookup' 1
+/-- info: 5 -/
+#guard_msgs in #eval test.lookup' 2
+/-- info: 5 -/
+#guard_msgs in #eval test.lookup' 3
+/-- info: 5 -/
+#guard_msgs in #eval test.lookup' 4
+#eval test.toList
+#eval test.length
 
 theorem transrefl_to_path' {a b : S} {R : S → S → Prop} (p : Relation.ReflTransGen R a b) : Nonempty (Path R a b) := by
   induction' p  with b c path_a_b R_b_c ih
@@ -101,6 +146,15 @@ def path_trans {x y z : S} {R : S → S → Prop} (p1 : Path R x y) (p2 : Path R
   match p1 with
     | .refl => p2
     | .tail p1_snoc h => path_trans p1_snoc (Path.head h p2)
+
+theorem trans_refl {x y z : S} {R : S → S → Prop} (p : Path R x y) : path_trans p Path.refl = p :=
+  match p with
+    | .refl => sorry
+    | .tail p1_snoc h => sorry
+
+
+theorem trans_tail {x y z c : S} {R : S → S → Prop} (p : Path R x y)  (snoc : Path R y z) (rel : R z c): path_trans p (Path.tail snoc rel) = Path.tail (path_trans p snoc) rel :=
+  sorry
 
 def stateSucceeds {S : Type} (a : Automaton S) (s2 s1 : S) : Prop :=
   ∃ (f i: S), a.I  i ∧ Relation.ReflTransGen a.R i s1 ∧ Relation.ReflTransGen a.R s1 f ∧ a.F f ∧ Relation.TransGen a.R f s2 -- ∧ f ≠ s1
@@ -217,26 +271,20 @@ noncomputable def transgen_to_path {a b : S} {R : S → S → Prop} (p : Relatio
 noncomputable def transrefl_to_path {a b : S} {R : S → S → Prop} (p : Relation.ReflTransGen R a b) : Path R a b :=
   Classical.choice (transrefl_to_path' p)
 
-noncomputable def concatPaths (s : ℕ → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) (i : Nat) : Path a.R (Exists.choose (Exists.choose_spec (y 0))) (s i.succ) :=
+noncomputable def concatPaths (s : ℕ → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) (i : Nat) : Path a.R (Exists.choose (Exists.choose_spec (y 0))) (s i) :=
   match i with
-    | 0 => by
-      let y0 := y 0
-      let k := (Exists.choose_spec (y0))
-      let k1 := (Exists.choose_spec (k))
-      rcases k1 with ⟨i_initial,i_to_sn,sn_to_f,f_fair,f_to_ssn⟩
-      let s1 := transrefl_to_path i_to_sn
-      let s2 := transrefl_to_path sn_to_f
-      let s3 := transgen_to_path f_to_ssn
-      exact path_trans s1 (path_trans s2 s3)
-    | i + 1 => by
-      let y0 := y (i + 1)
-      let r := concatPaths s y i
-      let k := (Exists.choose_spec (y0))
-      let k1 := (Exists.choose_spec (k))
-      rcases k1 with ⟨i_initial,i_to_sn,sn_to_f,f_fair,f_to_ssn⟩
-      let s2 := transrefl_to_path sn_to_f
-      let s3 := transgen_to_path f_to_ssn
-      exact path_trans r (path_trans s2 s3)
+    | 0 =>
+      -- let k1 :=
+      -- rcases k1 with ⟨i_initial,i_to_sn,sn_to_f,f_fair,f_to_ssn⟩
+      -- let s1 := transrefl_to_path k1.2.1
+      -- let s2 := transrefl_to_path k1.2.2.1
+      -- let s3 := transgen_to_path k1.2.2.2.2
+      transrefl_to_path (Exists.choose_spec (Exists.choose_spec (y 0))).2.1
+      -- exact path_trans s1 (path_trans s2 s3)
+    | i + 1 =>
+      let k1 := (Exists.choose_spec (Exists.choose_spec (y (i))))
+      -- rcases k1 with ⟨i_initial,i_to_sn,sn_to_f,f_fair,f_to_ssn⟩
+      path_trans (concatPaths s y i) (path_trans (transrefl_to_path k1.2.2.1) (transgen_to_path k1.2.2.2.2))
 /--
 y0: I0 ---> s0 ---> f0 ---> s1
 y1: I1 ---> s1 ---> f1 ---> s2
@@ -247,13 +295,161 @@ run : Nat -> S
 fair run: I0 --> s0 --> f0 --> s1 --> f1 --> s2 --> ....
 -/
 noncomputable def mkRun (s : ℕ → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) (i : Nat) : S :=
-  Path.lookup' (concatPaths s y i) i
+  Path.lookup (concatPaths s y i) i
+theorem lookup_succ {R : S → S → Prop} {a b : S} (p : Path R a b) (i : Nat) (le : i < p.length): R (Path.lookup p i) (Path.lookup p i.succ) := by
+  match p with
+    | Path.refl =>
+      simp [Path.length] at le
+    | Path.tail a b =>
+      simp [Path.toList, List.getD, le]
+      have x : ¬ (a.tail b).length ≤ i := by omega
+      simp [x]
+      sorry
+  -- induction' i with i ih
+  -- <;> simp [Path.lookup']
+  -- ·
+  --   -- unfold Path.lookup'
+  --   simp [Path.lookup', Path.toList, le]
+
+  --   sorry
+  -- · sorry
 set_option pp.proofs true
+
+def mkRunFn (s : Nat → S) (p : ∀ (i : Nat), Path a.R (s i) (s i.succ)) (l :∀ (i : Nat),  (p i).length > 0 ) ( i : Nat) : S :=
+    if (p i).length ≥ i then (p i).lookup i else mkRunFn (fun i => s (i + 1)) (fun i => p (i + 1)) (fun i => l (i + 1)) (i - (p i).length)
+termination_by i
+decreasing_by
+  have n := l i
+  omega
+theorem lookup_zero {a b : S} {R : S → S → Prop} (p : Path R a b) : p.lookup 0 = a := by
+  induction' p with x y a_to_x x_to_y  ih
+  <;> simp only [Path.lookup, ge_iff_le, nonpos_iff_eq_zero]
+  simp only [Path.length, Nat.add_eq_zero, one_ne_zero, false_and, ↓reduceIte, ih]
+
+
+-- theorem lookup_succ {a b : S} {R : S → S → Prop} (p : Path R a b) : p.lookup 0 = a := by
+--   induction' p with x y a_to_x x_to_y  ih
+--   <;> simp only [Path.lookup, ge_iff_le, nonpos_iff_eq_zero]
+--   simp only [Path.length, Nat.add_eq_zero, one_ne_zero, false_and, ↓reduceIte, ih]
+
+def mkRunSeg (s : Nat → S) (p : ∀ (i : Nat), Path a.R (s i) (s i.succ)) (l :∀ (i : Nat),  (p i).length > 0 ) : Run a := by
+  exact ⟨mkRunFn s p l, by
+    simp [mkRunFn, Path.lookup]
+    simp [lookup_zero]
+
+    sorry,
+
+    by
+      intro n
+      unfold mkRunFn
+      induction' n with n ih
+
+      simp [Path.lookup, lookup_zero]
+
+
+      -- simp [mkRunFn, Path.lookup]
+
+      sorry
+      sorry⟩
+
+def Path.contains {a b : S} {R : S → S → Prop} (p : Path R a b) (P : S → Prop) : Prop :=
+  ∃ (i : Nat), i ≤ p.length ∧ P (p.lookup i)
+
+theorem concat_len {a b c : S} {R : S → S → Prop} (p1 : Path R a b) (p2 : Path R b c) : (path_trans p1 p2).length = p1.length + p2.length :=
+    match p2 with
+    | @Path.refl S R _ => by
+      simp [Path.length,]
+      rw [trans_refl]
+      exact b
+      -- rfl
+      -- sorry
+    | .tail p1_snoc h => sorry
+-- theorem match_push {A B : Type } {n : Nat} {x : B} {y : Nat → B} {f : B → A}: f (match n with
+--   | 0 => x
+--   | Nat.succ i => y i) =  (match n with
+--   | 0 => f x
+--   | Nat.succ i => f (y i)) := sorry
+
+-- theorem run_fair (s : Nat → S) (p : ∀ (i : Nat), Path a.R (s i) (s i.succ)) (h : ∀ (i : Nat), (p i).contains (fun x => a.F x = true)) : (mkRunSeg s p).IsFair := by
+  -- sorry
+theorem concat_lookup (s : Nat → S) (n : Nat) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)): (concatPaths s y n).lookup n = (concatPaths s y n.succ).lookup n := by
+  sorry
+theorem lookup_concat {a b c :S} {R : S → S → Prop} {p1 : Path R a b} {p2 : Path R b c} {n : Nat} : (path_trans p1 p2).lookup (p1.length + n) = p2.lookup n :=
+  match p2 with
+    | .refl => by
+      simp [Path.length, path_trans]
+      rw [trans_refl p1]
+      -- exact
+
+      sorry
+      exact b
+
+    | .tail p1_snoc h => by
+      have y := lookup_concat (p1 := p1) (p2 := p1_snoc) (n := n)
+      -- have t : (if 1 + (p1.length + p1_snoc.length) ≤ p1.length + n) ↔ (if 1 + (p1.length + p1_snoc.length) ≤ p1.length + n) := by sorry
+      simp [Path.length, path_trans, trans_tail, concat_len, y]
+
+      sorry
+  -- sorry
+theorem lookup_concat_2 {a b c :S} {R : S → S → Prop} {p1 : Path R a b} {p2 : Path R b c} {n : Nat} (le : n < p1.length) : (path_trans p1 p2).lookup (n) = p1.lookup n := by
+  induction' p1 with x y a_to_x x_to_y ih
+  · simp only [Path.length, not_lt_zero'] at le
+  · simp [path_trans]
+    have  : ¬  ((a_to_x.tail x_to_y).length ≤ n) := by omega
+    simp [this]
+    by_cases c : n = (a_to_x).length
+    ·
+      sorry
+    · sorry
+
+-- theorem lookup_get : p1.lookup
+theorem fair_concat {m n : Nat} (s : Nat → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) : a.F ((concatPaths s y m).lookup (((concatPaths s y n).length + ( transrefl_to_path (Exists.choose_spec (Exists.choose_spec (y m))).2.2.1).length))) := by
+
+  sorry
+lemma head_trans {A B C D : S} {R : S → S → Prop} {x_to_y : R A B} {p2 : Path R B C} {p3 : Path R C D}: (Path.head x_to_y (path_trans p2 p3)) = path_trans (Path.head x_to_y p2) p3 := by
+  induction' p2 with p q a_to_p p_to_q ih
+  · simp only [path_trans, Path.head]
+  · simp only [path_trans, ih, Path.head]
+
+lemma path_assoc {A B C D : S} {R : S → S → Prop} {p1 : Path R A B} {p2 : Path R B C} {p3 : Path R C D}: path_trans p1 (path_trans p2 p3) = path_trans (path_trans p1 p2) p3 := by
+  induction' p1 with x y a_to_x x_to_y ih
+  · simp only [path_trans]
+  · simp only [path_trans, head_trans, ih]
+
+
+-- Step 4: factorization past n
+lemma factor_after_n {n m : ℕ} (hm : n ≤ m)  (s : Nat → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) :
+  ∃ Tail, concatPaths s y m = path_trans (concatPaths s y n) (Tail) := by
+  induction' hm with m hm ih
+  · let k1 := (Exists.choose_spec (Exists.choose_spec (y (n))))
+    use (path_trans (transrefl_to_path k1.2.2.1) (transgen_to_path k1.2.2.2.2))
+    simp only [Nat.reduceAdd, concatPaths]
+  · -- step m+1
+    rcases ih with ⟨Tail, hTail⟩
+    let k1 := (Exists.choose_spec (Exists.choose_spec (y m)))
+    let pm : Path a.R (s m) (s (m + 1)) := path_trans (transrefl_to_path k1.2.2.1) (transgen_to_path k1.2.2.2.2)
+    use path_trans (Tail) (pm)
+    rw [concatPaths]
+    nth_rw 2 [path_assoc]
+    rw [← hTail]
+theorem transgen_len {A B :S} {R : S → S → Prop} {p : Relation.TransGen R A B} : 0 < (transgen_to_path p).length := by
+  induction' p with b c a' b' a_to_a' a'_to_b' ih
+  · simp [transgen_to_path, transgen_to_path' ]
+    sorry
+  · sorry
+-- theorem path_concat_fe (c : ∃ (i : S), a.I i ∧ ∀  (p : Path a.R i x))
+theorem concatPaths_length (s : Nat → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) (n : Nat): n ≤ (concatPaths s y n).length := by
+  induction' n with n ih
+  · simp [concatPaths]
+  · simp [concatPaths, concat_len]
+    have := transgen_len (p := (concatPaths._proof_7 s y n))
+    omega
+
 theorem succeeds_wf (a : Automaton S) (fe : a.IsFairEmpty) : WellFounded (stateSucceeds a) := by
   -- simp [IsWellFounded]
   -- suggest
   -- suggest_hint
-  classical
+  -- classical
 
   simp [WellFounded.wellFounded_iff_no_descending_seq]
   by_contra c
@@ -262,36 +458,153 @@ theorem succeeds_wf (a : Automaton S) (fe : a.IsFairEmpty) : WellFounded (stateS
 
   rcases c with ⟨ s, y⟩
   simp [stateSucceeds] at y
-  have r : Run a := by
+  let r : Run a := by
     exact ⟨ mkRun s y, by
-      simp [mkRun, concatPaths, Path.lookup']
+      simp only [mkRun, Nat.reduceAdd, Nat.succ_eq_add_one, concatPaths]
+      simp only [lookup_zero]
       have cs := Exists.choose_spec (concatPaths._proof_2 s y)
       exact cs.1
       , by
-      simp [mkRun, concatPaths, Path.lookup']
       intro n
-      induction' n with n ih
-      · simp [concatPaths, Path.lookup', And.rec]
-        have cs := Exists.choose_spec (concatPaths._proof_2 s y)
-        rcases cs with ⟨ i_init , x_to_s0, s0_to_y, y_fair, y_to_s1 ⟩
-        simp only [s0_to_y, y_fair, y_to_s1, and_self, and_true]
+      simp only [mkRun, Nat.reduceAdd, Nat.succ_eq_add_one]
+      rw [concat_lookup]
+      apply lookup_succ
+      sorry⟩
 
-        sorry
-
-      · simp [concatPaths, Path.lookup', And.rec]
-        -- have cs := Exists.choose_spec (concatPaths._proof_2 s y)
-        -- rcases cs with ⟨ i_init , x_to_s0, s0_to_y, y_fair, y_to_s1 ⟩
-        -- simp [s0_to_y, y_fair, y_to_s1, i_init,x_to_s0]
-
-        sorry⟩
-  -- have con : ∃ (r : Run a), r.IsFair := by
-  --   -- rw [← Run.exists_fairN_fair]
-  --    , sorry⟩
   have r_fair : r.IsFair := by
+
+    -- by_contra c
     simp [Run.IsFair]
-    sorry
+    simp [r]
+    -- rcases c with ⟨ max, t ⟩
+
+    simp [mkRun, concatPaths]
+    intro n
+    -- let y0 := y (n + 1)
+    -- let k := (Exists.choose_spec (y0))
+    -- let k1 := (Exists.choose_spec (k))
+    -- rcases k1 with ⟨i_initial,i_to_sn,sn_to_f,f_fair,f_to_ssn⟩
+    -- let s2 := transrefl_to_path (Exists.choose_spec (Exists.choose_spec (y0))).2.2.1
+    -- have thing : 0 < s2.length := by sorry
+    -- have thing2 : 0 < n + s2.length := by omega
+    -- have things3 : n < (concatPaths s y n).length := by sorry
+    -- have thing4 : n < (concatPaths s y n).length + s2.length := by omega
+    -- have thing5 : 0 < (concatPaths s y n).length + s2.length := by omega
+    let yn := y n
+    let f := (Exists.choose yn)                  -- the fair state in the nth block
+    let inits := Exists.choose_spec yn           -- ∃ i, ...
+    let i := (Exists.choose inits)
+    let spec := Exists.choose_spec inits         -- unpack the conjunction
+    let hiI : a.I i := spec.1
+    let hi_to_sn : Relation.ReflTransGen a.R i (s n) := spec.2.1
+    let hsn_to_f : Relation.ReflTransGen a.R (s n) f := spec.2.2.1
+    let hf : a.F f := spec.2.2.2.1
+    let hf_to_snp1  : Relation.TransGen a.R f (s (n+1)) := spec.2.2.2.2
+
+    let SnF :  Path a.R (s n) (f)  := transrefl_to_path hsn_to_f
+
+  -- - Now set
+    let Pn := concatPaths s y n
+    let k := Pn.length + (SnF.length)  -- this will be your fair index
+    use k
+    -- simp [k]
+    -- have :  (concatPaths s y k).lookup k = (concatPaths s y (n+1)).lookup k := by
+      -- sorry
+    have t0 : n < k := by
+      simp [k, Pn, SnF, transgen_len]
+      sorry
+
+    have t1 : (concatPaths s y (n + 1)).lookup k = f := by
+      simp [concatPaths, k, Pn]
+      simp [lookup_concat, SnF]
+      have : hsn_to_f = (concatPaths._proof_6 s y n) := by
+        rfl
+      rw [← this]
+      have : (transrefl_to_path hsn_to_f).length =  (transrefl_to_path hsn_to_f).length + 0 := by simp
+      rw [this]
+      rw [lookup_concat]
+      simp only [lookup_zero, k, SnF, Pn, f]
+
+    have t2 : (concatPaths s y k).lookup k = (concatPaths s y (n + 1)).lookup k := by
+      -- extract_goal
+      have := factor_after_n (n := n + 1) (m := k) (by omega) s y
+      rcases this with ⟨ Tail, hTail ⟩
+      rw [hTail]
+      rw [lookup_concat_2]
+      simp [concatPaths]
+      simp [concat_len]
+      simp [k, Pn, SnF]
+      simp [transgen_len]
+    have t3 : (concatPaths s y k).lookup k = f := by
+      simp [t1,t2]
+    simp [t3, hf, t0]
+    -- omega
+
+    -- use (concatPaths s y n).length + s2.length
+    -- simp [k, thing4]
+    -- nth_rw 2 [concatPaths.eq_def]
+    -- simp [thing5]
+    -- -- simp [match_push (f := fun p => Path.lookup p)  ]
+    -- cases h : ((concatPaths s y n).length + s2.length)  with
+    --   | zero =>
+    --     have : n < 0 := by
+    --       sorry
+    --     omega
+    --     -- simp [lookup_zero]
+    --     -- have cs := Exists.choose_spec (concatPaths._proof_2 s y)
+    --     -- exact cs.2.2.2.1
+    --     -- sorry
+    --   | succ i =>
+    --     simp [concat_len, lookup_concat]
+    --     simp [← h]
+    --     -- simp [add_assoc]
+    --     -- rw [lookup_concat (p1 := (concatPaths s y i)) (p2 := path_trans (transrefl_to_path (concatPaths._proof_6 s y i))
+    --         -- (transgen_to_path (concatPaths._proof_7 s y i))) (n := s2.length)]
+
+    --     -- rw [i]
+    --     -- rw [add_assoc]
+    --     sorry
+    -- unfold concatPaths
+    -- cases n with
+    --   | zero =>
+    --     simp [concatPaths, concat_len]
+    --     -- simp []
+    --     sorry
+    --   | succ i =>
+    --     simp [concatPaths]
+    --     simp [concat_len]
+    --     repeat rw [concat_len]
+    --     rw [add_assoc]
+    --     rw [match_push (f := fun p => p.lookup
+    --   ((concatPaths s y i).length +
+    --     ((transrefl_to_path (concatPaths._proof_6 s y i)).length +
+    --         (transgen_to_path (concatPaths._proof_7 s y i)).length +
+    --       s2.length))) (n := (concatPaths s y i).length +
+    --         ((transrefl_to_path (concatPaths._proof_6 s y i)).length +
+    --             (transgen_to_path (concatPaths._proof_7 s y i)).length +
+    --           s2.length))]
+
+        -- rw [lookup_concat_2]
+        -- unfold concatPaths
+        -- simp [lookup_concat]
+        -- exact fair_concat s (m := i) y
+        -- unfold concatPaths
+        -- nth_rw 1 [concatPaths.eq_def]
+
+        -- rw [concatPaths.eq_def]
+        -- simp [lookup_concat]
+        -- sorry
+
+    -- simp [concatPaths]
+
+    -- simp [mkRun, concatPaths, Path.lookup]
+    -- unfold concatPaths
+    -- simp [thing2,thing]
     -- sorry
-  exact fe (r) (r_fair)
+    -- sorry
+
+  exact fe r r_fair
+
 
   -- contradiction
   -- simp at t
