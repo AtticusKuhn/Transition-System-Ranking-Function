@@ -44,6 +44,21 @@ variable {S : Type} {a : Automaton S} (r : Run a)
 This is expressed as $\forall n \in \mathbb{N}, \exists k > n, f(k) \in F$. -/
 @[simp]
 def Run.IsFair : Prop := ∀ (n : Nat), ∃ (k : Nat), k > n ∧ a.F (r.f k)
+def Run.IsFair2 : Prop := ∀ (n : Nat), ∃ (k : Nat), k ≥ n ∧ a.F (r.f k)
+
+theorem fair_iff_fair2 : r.IsFair ↔ r.IsFair2 := by
+  constructor
+  · intro h n
+    rcases h n with ⟨ k, hk, fk ⟩
+    use k
+    constructor
+    · exact Nat.le_of_lt hk
+    · exact fk
+  · intro h n
+    rcases h n.succ with ⟨ k, hk, fk ⟩
+    use k
+    simp only [gt_iff_lt, fk, and_true]
+    omega
 
 @[simp]
 def Run.IsFairN (n k : Nat) : Prop := n ≤ Nat.count (fun m => a.F (r.f m)) k
