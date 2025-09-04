@@ -63,24 +63,45 @@ This is a property of strictly antitone sequences.
 For $m, n \in \mathbb{N}$, $W(r.f(\text{nth_visit}(r, m))) < W(r.f(\text{nth_visit}(r, n))) \iff n < m$. -/
 theorem ordSeq_lt_iff_lt (r_fair : r.IsFair) {m n : ℕ} : ordSeq r W m < ordSeq r W n ↔ n < m := StrictAnti.lt_iff_lt (ordSeq_strict_anti r W r_fair)
 
+/-
+State `s2` succeeds state `s1` via a fair witness reachable from `s1`.
+
+There exists `f` with `R* s1 f`, `f ∈ F`, and `R+ f s2`.
+-/
 def stateSucceeds2 {S : Type} (a : Automaton S) (s2 s1 : S) : Prop :=
   ∃ (f : S), Relation.ReflTransGen a.R s1 f ∧ a.F f ∧ Relation.TransGen a.R f s2 -- ∧ f ≠ s1
 
 
 
+/-
+State `s2` succeeds state `s1` with an initial state witness.
+
+There exist `i, f` such that `i ∈ I`, `R* i s1`, `R* s1 f`, `f ∈ F`, and `R+ f s2`.
+-/
 def stateSucceeds {S : Type} (a : Automaton S) (s2 s1 : S) : Prop :=
   ∃ (f i: S), a.I  i ∧ Relation.ReflTransGen a.R i s1 ∧ Relation.ReflTransGen a.R s1 f ∧ a.F f ∧ Relation.TransGen a.R f s2 -- ∧ f ≠ s1
 
+/-
+Dependent pair version carrying explicit path witnesses for each segment.
+-/
 def stateSucceeds4 {S : Type} (a : Automaton S) (s2 s1 : S) : Type :=
   Σ (f i: S), Inhabited (a.I  i) ×  Path a.R i s1 × Path a.R s1 f × Inhabited (a.F f) × Path a.R f s2 -- ∧ f ≠ s1
 
 
+/-
+Run-based definition: `s2` succeeds `s1` if there is a run visiting `s1` at `i`, then a fair state at `j`, then `s2` at `k` with `i ≤ j < k`.
+-/
 def stateSucceeds3 {S : Type} (a : Automaton S) (s2 s1 : S) : Prop :=
   ∃ (r : Run a), ∃ (i j k : Nat), i ≤ j ∧ j < k ∧ s1 = r.f i ∧ s2 = r.f k ∧ a.F (r.f j)
 
 
 
 
+/-
+If `s1 → s2` and `n` succeeds `s1`, then `n` also succeeds `s2`.
+
+Uses transitivity of `Relation.TransGen` to append the edge `s1 → s2` at the end.
+-/
 theorem succeeds_concat { S : Type} (s1 s2 n : S)  (a : Automaton S)  (s1_r_s2 : a.R s1 s2) (n_suc_s2 : stateSucceeds a s1 n) : stateSucceeds a s2 n := by
   rcases n_suc_s2 with ⟨ f, i, i_init, i_to_s2, s2_to_f, f_fair, f_to_n  ⟩
   exact ⟨f, i, i_init, i_to_s2 , by
@@ -93,6 +114,11 @@ theorem succeeds_concat { S : Type} (s1 s2 n : S)  (a : Automaton S)  (s1_r_s2 :
     ⟩
 
 
+/-
+If `s1` is reachable and `n` succeeds `s2` with an edge `s1 → s2`, then `n` succeeds `s1`.
+
+This moves the initial reachability witness backward along a single edge.
+-/
 theorem succeeds_concat4 { S : Type} (s1 s2 n : S)  (a : Automaton S)  (s1_r_s2 : a.R s1 s2) (n_suc_s2 : stateSucceeds a n s2) (s1_reach : State.IsReachable (a := a) s1) : stateSucceeds a n s1 := by
   rcases n_suc_s2 with ⟨ f, _i, _i_init, i_to_s2, rt, f_fair, tg ⟩
   rcases s1_reach with ⟨ i, i_to_s1, i_init⟩
@@ -103,13 +129,19 @@ theorem succeeds_concat4 { S : Type} (s1 s2 n : S)  (a : Automaton S)  (s1_r_s2 
   use s2
 
 
+/-
+Concatenate the path segments for successive blocks witnessing `stateSucceeds`.
+
+Builds a `Path a.R` from the initial state of `y 0` to `s i` by chaining the segments in blocks `[s n → f_n → s (n+1)]`.
+-/
 noncomputable def concatPaths (s : ℕ → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) (i : Nat) : Path a.R (Exists.choose (Exists.choose_spec (y 0))) (s i) :=
   match i with
     | 0 =>
       transrefl_to_path (Exists.choose_spec (Exists.choose_spec (y 0))).2.1
     | i + 1 =>
       let k1 := (Exists.choose_spec (Exists.choose_spec (y (i))))
-      path_trans (concatPaths s y i) (path_trans (transrefl_to_path k1.2.2.1) (transgen_to_path k1.2.2.2.2))
+      Path.concat (concatPaths s y i)
+        (Path.concat (transrefl_to_path k1.2.2.1) (transgen_to_path k1.2.2.2.2))
 /--
 y0: I0 ---> s0 ---> f0 ---> s1
 y1: I1 ---> s1 ---> f1 ---> s2
@@ -119,27 +151,41 @@ concat the path
 run : Nat -> S
 fair run: I0 --> s0 --> f0 --> s1 --> f1 --> s2 --> ....
 -/
+/-
+The run corresponding to the concatenated path up to block `i`.
+
+`mkRun s y i =` the `i`-th vertex along `concatPaths s y (i+1)`.
+-/
 noncomputable def mkRun (s : ℕ → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) (i : Nat) : S :=
   Path.lookup (concatPaths s y i.succ) i
 
 
 
+/-
+Factorization: the path to block `m` factors as the path to `n` concatenated with a tail.
+-/
 lemma factor_after_n {n m : ℕ} (hm : n ≤ m)  (s : Nat → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) :
-  ∃ Tail, concatPaths s y m = path_trans (concatPaths s y n) (Tail) := by
+  ∃ Tail, concatPaths s y m = Path.concat (concatPaths s y n) (Tail) := by
   induction' hm with m hm ih
   · use Path.refl
     symm
-    exact trans_refl (concatPaths s y n)
+    exact Path.concat_refl_right (concatPaths s y n)
   · rcases ih with ⟨Tail, hTail⟩
     let k1 := (Exists.choose_spec (Exists.choose_spec (y m)))
-    use path_trans Tail (path_trans (transrefl_to_path k1.2.2.1) (transgen_to_path k1.2.2.2.2))
+    use Path.concat Tail (Path.concat (transrefl_to_path k1.2.2.1) (transgen_to_path k1.2.2.2.2))
     rw [concatPaths]
-    nth_rw 2 [path_assoc]
+    nth_rw 2 [Path.concat_assoc]
     rw [← hTail]
 
+/-
+Any path extracted from a `TransGen` witness has positive length: `0 < length (transgen_to_path p)`.
+-/
 theorem transgen_len {A B :S} {R : S → S → Prop} {p : Relation.TransGen R A B} : 0 < (transgen_to_path p).length :=
-  Exists.choose_spec (transgen_to_path2 p)
+  Exists.choose_spec (transgen_to_path_with_pos_length p)
 
+/-
+Lower bound on concatenated path length: `n ≤ length (concatPaths s y n)`.
+-/
 theorem concatPaths_length (s : Nat → S) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) (n : Nat) : n ≤ (concatPaths s y n).length := by
   induction' n with n ih
   · simp only [Nat.reduceAdd, concatPaths, zero_le]
@@ -147,12 +193,18 @@ theorem concatPaths_length (s : Nat → S) (y : ∀ (n : ℕ), stateSucceeds a (
     have := transgen_len (p := (concatPaths._proof_7 s y n))
     omega
 
+/-
+Stability of early vertices: the `n`-th vertex is the same between blocks `n+1` and `n+2`.
+-/
 theorem concat_lookup (s : Nat → S) (n : Nat) (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)): (concatPaths s y (n + 1)).lookup n = (concatPaths s y (n + 2)).lookup n := by
   rcases factor_after_n (n := n + 1) (m := n + 2) (by omega) s y  with ⟨ Tail, hTail ⟩
-  rw [hTail, lookup_concat_2]
+  rw [hTail, lookup_concat_left]
   have := concatPaths_length s y (n + 1)
   omega
 
+/-
+Build a run from the infinite concatenation of the `stateSucceeds` blocks (Vardi’s construction).
+-/
 noncomputable def vardiRun (s : Nat → S)  (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) : Run a := ⟨mkRun s y, by
   simp only [mkRun, Nat.reduceAdd, Nat.succ_eq_add_one, concatPaths, lookup_zero]
   exact (Exists.choose_spec (concatPaths._proof_2 s y)).1
@@ -165,6 +217,9 @@ noncomputable def vardiRun (s : Nat → S)  (y : ∀ (n : ℕ), stateSucceeds a 
   omega
   ⟩
 
+/-
+The constructed run is fair: each block contributes a fair visit strictly later in the path.
+-/
 theorem vardiRun_fair (s : Nat → S)  (y : ∀ (n : ℕ), stateSucceeds a (s (n + 1)) (s n)) : (vardiRun s y).IsFair := by
     rw [fair_iff_fair2]
     simp only [Run.IsFair2, ge_iff_le, mkRun, Nat.reduceAdd, Nat.succ_eq_add_one, vardiRun]
@@ -198,13 +253,16 @@ theorem vardiRun_fair (s : Nat → S)  (y : ∀ (n : ℕ), stateSucceeds a (s (n
       simp only [lookup_zero, k, SnF, Pn, f]
     have t2 : (concatPaths s y k.succ).lookup k = (concatPaths s y (n + 1)).lookup k := by
       rcases factor_after_n (n := n + 1) (m := k.succ) (by omega) s y with ⟨ Tail, hTail ⟩
-      rw [hTail, lookup_concat_2]
+      rw [hTail, lookup_concat_left]
       simp only [Nat.reduceAdd, concatPaths, concat_len, add_lt_add_iff_left, lt_add_iff_pos_right,
         transgen_len, k, Pn, SnF, f]
     have t3 : (concatPaths s y k.succ).lookup k = f := by
       simp only [Nat.reduceAdd, Nat.succ_eq_add_one, t2, t1, k, Pn, f, SnF]
     simp only [t0, t3, hf, and_self, k, Pn, f, SnF]
 
+/-
+If `a` has no fair runs, then `stateSucceeds a` is well-founded.
+-/
 theorem succeeds_wf (a : Automaton S) (fe : a.IsFairEmpty) : WellFounded (stateSucceeds a) := by
   simp only [WellFounded.wellFounded_iff_no_descending_seq]
   by_contra c
@@ -213,6 +271,9 @@ theorem succeeds_wf (a : Automaton S) (fe : a.IsFairEmpty) : WellFounded (stateS
   exact fe (vardiRun s y) (vardiRun_fair s y)
 
 
+/-
+Provide the `IsWellFounded` instance for `stateSucceeds` from `succeeds_wf`.
+-/
 instance n {S  : Type} (a : Automaton S) (fe : a.IsFairEmpty) : IsWellFounded S (stateSucceeds a) where
   wf := succeeds_wf a fe
 
@@ -231,7 +292,20 @@ theorem isFairEmpty_of_ordinalRankingFunction (W : OrdinalRankingFunction.{0} a)
 
 
 
-noncomputable def completeness (fe : a.IsFairEmpty) : (OrdinalRankingFunction.{0} a) := ⟨@IsWellFounded.rank S (stateSucceeds a) (n a fe), fun s1 s2  rel => by
+/-
+Completeness: construct an ordinal ranking from emptiness of fair runs.
+
+Given `fe : a.IsFairEmpty`, the relation `stateSucceeds a` is well-founded, and we
+define `W` to be the `WellFounded.rank` on this relation. This yields an
+`OrdinalRankingFunction a` whose rank strictly decreases on fair steps and never
+increases otherwise. In particular, for every transition `s1 → s2` we have
+$$
+  W(s_2) + \mathbb{I}(s_1 \in F) \le W(s_1),
+$$
+where `\mathbb{I}` is the indicator of fairness. This is the converse direction
+to `isFairEmpty_of_ordinalRankingFunction`.
+-/
+noncomputable def ordinalRankingFunction_of_isFairEmpty (fe : a.IsFairEmpty) : (OrdinalRankingFunction.{0} a) := ⟨@IsWellFounded.rank S (stateSucceeds a) (n a fe), fun s1 s2  rel => by
     intro s1_reachable s1_fair
     apply IsWellFounded.rank_lt_of_rel (hwf := n a fe)
     rcases s1_reachable with ⟨i, i_to_s1, i_initial⟩
@@ -272,5 +346,5 @@ noncomputable def completeness (fe : a.IsFairEmpty) : (OrdinalRankingFunction.{0
     contradiction
     ⟩
 
---info: 'completeness' depends on axioms: [propext, Classical.choice, Quot.sound]
-#print axioms completeness
+--info: 'ordinalRankingFunction_of_isFairEmpty' depends on axioms: [propext, Classical.choice, Quot.sound]
+#print axioms ordinalRankingFunction_of_isFairEmpty
