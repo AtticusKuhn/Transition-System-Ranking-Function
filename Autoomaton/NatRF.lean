@@ -103,15 +103,22 @@ theorem isFairEmpty_of_rankingFunction (V : RankingFunction a) : a.IsFairEmpty :
 
 -- def decidable_path (s1 : S) [Finite S] [f : (s1 s2 : S) → Decidable (a.R s1 s2)] : DecidablePred (fun s2 ↦ Relation.ReflTransGen a.R s1 s2) := sorry
 
-noncomputable def fair_successors (s1 : S) [fin : Finite S] : Finset S :=
+@[simp, reducible]
+noncomputable def fair_successors (s1 : S) [Finite S] : Finset S :=
   let _ : Fintype S := Fintype.ofFinite S
   let _ : DecidablePred (fun s2 ↦ Relation.ReflTransGen a.R s1 s2 ∧ a.F s2) := Classical.decPred (fun s2 ↦ Relation.ReflTransGen a.R s1 s2 ∧ a.F s2)
   {s2 | Relation.ReflTransGen a.R s1 s2 ∧ a.F s2}
 
+theorem f_subset (s1 s2 : S) [Finite S] (s1_r_s2 : a.R  s1 s2) : fair_successors (a := a) s2 ⊆ fair_successors (a := a) s1 := fun e e_mem => by
+  simp only [fair_successors, Finset.mem_filter, Finset.mem_univ, true_and] at e_mem
+  rcases e_mem with ⟨e_r_s2, e_f⟩
+  simp only [fair_successors, Finset.mem_filter, Finset.mem_univ, e_f, and_true, true_and]
+  exact Relation.ReflTransGen.trans (Relation.ReflTransGen.single s1_r_s2) (e_r_s2)
+
 noncomputable def fair_count (s1 : S) [fin : Finite S] : Nat :=
   Finset.card (fair_successors (a := a) s1)
 
-theorem lt_le (a b : Nat) :  (a  + 1 ≤ b) ↔ (a < b) := by omega
+theorem lt_le (a b : Nat) : (a  + 1 ≤ b) ↔ (a < b) := by omega
 
 noncomputable def completeness [fin : Finite S] (a : Automaton S) (fe : a.IsFairEmpty) : RankingFunction a := {
   rank := fun s => fair_count (a := a) s,
@@ -119,18 +126,10 @@ noncomputable def completeness [fin : Finite S] (a : Automaton S) (fe : a.IsFair
   init_reach := init_reachable (a := a),
   next_reach := next_reachable (a := a) ,
   rank_le_of_rel := fun s1 s2 s1_r_s2 s1_reach => by
-    have f_subset : fair_successors (a := a) s2 ⊆ fair_successors (a := a) s1 := by
-      intro e e_mem
-      simp only [fair_successors, Finset.mem_filter, Finset.mem_univ, true_and] at e_mem
-      rcases e_mem with ⟨e_r_s2, e_f⟩
-      simp only [fair_successors, Finset.mem_filter, Finset.mem_univ, e_f, and_true, true_and]
-      trans s2
-      · exact Relation.ReflTransGen.single s1_r_s2
-      · exact e_r_s2
+    have f_subset  : fair_successors (a := a) s2 ⊆ fair_successors (a := a) s1 := f_subset s1 s2 s1_r_s2
     by_cases s1_fair : a.F s1
     <;> simp only [fair_count, fair_successors, s1_fair, ↓reduceIte, lt_le, gt_iff_lt, s1_fair, Bool.false_eq_true, ↓reduceIte, add_zero, ge_iff_le]
     · apply Finset.card_lt_card
-      simp only [fair_successors] at f_subset
       simp only [Finset.ssubset_def, f_subset, true_and]
       intro sub
       have s1_in : s1 ∈ fair_successors (a := a) s2 :=
@@ -140,7 +139,7 @@ noncomputable def completeness [fin : Finite S] (a : Automaton S) (fe : a.IsFair
       simp only [fair_successors, Finset.mem_filter, Finset.mem_univ, true_and] at s1_in
       rcases s1_in with ⟨s2_r_s1, _⟩
       apply fe
-      apply vardiRun_fair (if Even · then s2 else s1)
+      apply vardiRun_fair (if Even · then s1 else s2)
       · intro n
         rcases s1_reach with ⟨ i, i_rfm, i_init⟩
         by_cases p : Even n
@@ -148,11 +147,8 @@ noncomputable def completeness [fin : Finite S] (a : Automaton S) (fe : a.IsFair
         <;> use s1, i
         <;> simp only [i_init, i_rfm, Relation.ReflTransGen.refl, s1_fair,
             Relation.TransGen.single s1_r_s2, s2_r_s1, and_self, true_and]
-        exact ⟨by
-          trans s1
-          · exact i_rfm
-          · exact Relation.ReflTransGen.single s1_r_s2
-            , by
+        exact ⟨Relation.ReflTransGen.trans i_rfm (Relation.ReflTransGen.single s1_r_s2),
+            by
             rw [Relation.TransGen.head'_iff]
             use s2
             ⟩
