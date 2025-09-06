@@ -3,4 +3,6 @@
 import Autoomaton.Buchi
 import Autoomaton.NatRF
 import Autoomaton.OrdinalRF
+import Autoomaton.Ordinal2
 import Autoomaton.Path
+import Autoomaton.succeeds

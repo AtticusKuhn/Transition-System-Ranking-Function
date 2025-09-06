@@ -23,6 +23,7 @@ set_option pp.universes true in
 structure Automaton (S : Type) where
   /-- The transition relation $R \subseteq S \times S$. -/
   R : S → S → Prop
+  -- Rdec : ∀ s1: S, DecidablePred (R s1)
   /-- The set of initial states $I \subseteq S$. -/
   I : S → Bool
   /-- The set of fair (accepting) states $F \subseteq S$. -/
@@ -64,6 +65,17 @@ theorem fair_iff_fair2 : r.IsFair ↔ r.IsFair2 := by
 def State.IsReachable (s : S) : Prop :=
   -- ∃ (r : Run a), ∃ (i : Nat), r.f i = s
   ∃ (i : S), Relation.ReflTransGen a.R i s ∧ a.I i
+
+theorem init_reachable (s : S) (p : a.I s) : State.IsReachable (a := a) s := by
+  use s
+
+theorem next_reachable (s1 s2 : S) (rel : a.R s1 s2)  (r_s1 : State.IsReachable (a := a) s1 ): State.IsReachable (a := a)  s2 := by
+  rcases r_s1 with ⟨ i, i_rfm, i_init⟩
+  use i
+  simp only [i_init, and_true]
+  rw [Relation.ReflTransGen.cases_tail_iff]
+  right
+  use s1
 
 theorem run_reachable (n : Nat) : State.IsReachable (a := a) (r.f n) := by
   -- use r

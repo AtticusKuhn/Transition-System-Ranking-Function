@@ -1,19 +1,28 @@
 import Autoomaton.Buchi
-
+import Autoomaton.Path
+import Autoomaton.succeeds
 variable {S : Type} {a : Automaton S} (r : Run a)
 
 /-- A ranking function for a Büchi automaton maps states to natural numbers.
 The rank must not increase along transitions. If the source state of a transition is fair, the rank must strictly decrease.
 This is a witness for the emptiness of fair runs for an automaton.
 -/
-structure RankingFunction {S : Type} (a : Automaton S) where
+structure RankingFunction {S : Type} (a : Automaton S) : Type where
   /-- The ranking function $V: S \to \mathbb{N}$. -/
-  (rank : S → Nat)
+  rank : S → Nat
+  reach : S → Prop
+  init_reach : (s : S) → a.I s → reach s
+  next_reach (s1 s2 : S) : a.R s1 s2 → reach s1 → reach s2
   /-- The condition on the ranking function: for all transitions $(s_1, s_2) \in R$,
   $V(s_2) + \mathbb{I}(s_1 \in F) \le V(s_1)$, where $\mathbb{I}$ is the indicator function. -/
-  (rank_le_of_rel : ∀ s1 s2, a.R s1 s2 → rank s2 + (if a.F s1 then 1 else 0) ≤ rank s1)
+  (rank_le_of_rel : ∀ s1 s2, a.R s1 s2  → reach s1 → rank s2 + (if a.F s1 then 1 else 0) ≤ rank s1)
 
 variable (V : RankingFunction a)
+
+theorem nat_run_reachable (n : Nat) : V.reach (r.f n) := by
+  induction' n with m ih
+  · exact V.init_reach (r.f 0) (r.is_init)
+  · exact V.next_reach (r.f m) (r.f (m + 1)) (r.is_valid m) ih
 
 /-- The set of natural numbers `n` for which the state `r.f n` is a fair state.
 This represents the time indices at which a run `r` visits a fair state.
@@ -37,7 +46,7 @@ lemma rank_plus_fairCount_le_rank_zero (y : Nat) : V.rank (r.f y) + fairCount r 
   induction' y with i ih
   · simp only [fairCount, Nat.count_zero, add_zero, le_refl]
   · simp only [Nat.count_succ, fairCount] at *
-    have : V.rank (r.f (i + 1)) + (if a.F (r.f i) then 1 else 0) ≤ V.rank (r.f i) := V.rank_le_of_rel (r.f i) (r.f (i + 1)) (r.is_valid i)
+    have : V.rank (r.f (i + 1)) + (if a.F (r.f i) then 1 else 0) ≤ V.rank (r.f i) := V.rank_le_of_rel (r.f i)  (r.f (i + 1)) (r.is_valid i) (nat_run_reachable r V i)
     omega
 
 /-- The number of fair visits up to any time `y` is bounded by the rank of the initial state.
@@ -91,3 +100,63 @@ theorem isFairEmpty_of_rankingFunction (V : RankingFunction a) : a.IsFairEmpty :
       Set.mem_setOf_eq] at x_gt_max
     have x_lt_x : x < x := x_gt_max x x_fair
     omega
+
+-- def decidable_path (s1 : S) [Finite S] [f : (s1 s2 : S) → Decidable (a.R s1 s2)] : DecidablePred (fun s2 ↦ Relation.ReflTransGen a.R s1 s2) := sorry
+
+noncomputable def fair_successors (s1 : S) [fin : Finite S] : Finset S :=
+  let _ : Fintype S := Fintype.ofFinite S
+  let _ : DecidablePred (fun s2 ↦ Relation.ReflTransGen a.R s1 s2 ∧ a.F s2) := Classical.decPred (fun s2 ↦ Relation.ReflTransGen a.R s1 s2 ∧ a.F s2)
+  {s2 | Relation.ReflTransGen a.R s1 s2 ∧ a.F s2}
+
+noncomputable def fair_count (s1 : S) [fin : Finite S] : Nat :=
+  Finset.card (fair_successors (a := a) s1)
+
+theorem lt_le (a b : Nat) :  (a  + 1 ≤ b) ↔ (a < b) := by omega
+
+noncomputable def completeness [fin : Finite S] (a : Automaton S) (fe : a.IsFairEmpty) : RankingFunction a := {
+  rank := fun s => fair_count (a := a) s,
+  reach := State.IsReachable (a := a),
+  init_reach := init_reachable (a := a),
+  next_reach := next_reachable (a := a) ,
+  rank_le_of_rel := fun s1 s2 s1_r_s2 s1_reach => by
+    have f_subset : fair_successors (a := a) s2 ⊆ fair_successors (a := a) s1 := by
+      intro e e_mem
+      simp only [fair_successors, Finset.mem_filter, Finset.mem_univ, true_and] at e_mem
+      rcases e_mem with ⟨e_r_s2, e_f⟩
+      simp only [fair_successors, Finset.mem_filter, Finset.mem_univ, e_f, and_true, true_and]
+      trans s2
+      · exact Relation.ReflTransGen.single s1_r_s2
+      · exact e_r_s2
+    by_cases s1_fair : a.F s1
+    <;> simp only [fair_count, fair_successors, s1_fair, ↓reduceIte, lt_le, gt_iff_lt, s1_fair, Bool.false_eq_true, ↓reduceIte, add_zero, ge_iff_le]
+    · apply Finset.card_lt_card
+      simp only [fair_successors] at f_subset
+      simp only [Finset.ssubset_def, f_subset, true_and]
+      intro sub
+      have s1_in : s1 ∈ fair_successors (a := a) s2 :=
+        sub (by
+          simp only [Finset.mem_filter, Finset.mem_univ, s1_fair, and_true, true_and]
+          exact Relation.ReflTransGen.refl)
+      simp only [fair_successors, Finset.mem_filter, Finset.mem_univ, true_and] at s1_in
+      rcases s1_in with ⟨s2_r_s1, _⟩
+      apply fe
+      apply vardiRun_fair (if Even · then s2 else s1)
+      · intro n
+        rcases s1_reach with ⟨ i, i_rfm, i_init⟩
+        by_cases p : Even n
+        <;> simp only [Nat.even_add_one, p, not_false_eq_true, not_true_eq_false, ↓reduceIte]
+        <;> use s1, i
+        <;> simp only [i_init, i_rfm, Relation.ReflTransGen.refl, s1_fair,
+            Relation.TransGen.single s1_r_s2, s2_r_s1, and_self, true_and]
+        exact ⟨by
+          trans s1
+          · exact i_rfm
+          · exact Relation.ReflTransGen.single s1_r_s2
+            , by
+            rw [Relation.TransGen.head'_iff]
+            use s2
+            ⟩
+    · exact Finset.card_le_card f_subset
+}
+
+#print axioms completeness

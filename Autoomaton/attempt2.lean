@@ -1,5 +1,6 @@
 import Autoomaton.Buchi
 import Autoomaton.NatRF
+import Autoomaton.OrdinalRF
 
 
 def ackStep (p : (Nat × List Nat)) : (Nat × List Nat) :=
@@ -100,7 +101,7 @@ def AckSystem : Automaton (Nat × List Nat) where
 --   match p with
 --   | ⟨ x,  y⟩ => let m : Nat := ackMax (x, y)
 --   (@y.foldrIdx Nat Ordinal (fun i b a => a + b * Ordinal.omega0 ^ (m - i)) Ordinal.zero.zero 0) + (m - x)
-def ackRankf (p : Nat × List Nat) : Ordinal :=
+def ackRankf (p : Nat × List Nat) : Ordinal.{0} :=
   match p with
   | ⟨n, l⟩ =>
     let m : Nat := ackMax (n, l)
@@ -139,12 +140,12 @@ theorem t1 : ackRankf ⟨ 2, [2, 1, 1]⟩ = Ordinal.omega0^11 + Ordinal.omega0^1
 -- theorem ord_lt (m : Ordinal.{0}) (t : Ordinal.{0}) : m - Order.succ t < m - t := by
 --   sorry
 
-universe v
+universe u v
 theorem mapIdx_append {α : Type u} {β : Type v} {f : ℕ → α → β} {l : List α} {e r : α} : List.mapIdx f (l ++ [e, r]) = List.mapIdx f l ++ [f l.length e, f l.length.succ r] := by
     rw [List.append_cons]
     simp only [List.mapIdx_concat, List.length_append, List.length_cons, List.length_nil, zero_add,
       List.nil_append, Nat.succ_eq_add_one]
-    simp
+    simp only [List.append_assoc, List.cons_append, List.nil_append]
 
 theorem f  { n  : Nat}: (Order.succ n : Ordinal.{0}) = (Nat.succ n) := by
   simp only [Nat.succ_eq_add_one, Nat.cast_add, Nat.cast_one, Ordinal.add_one_eq_succ]
@@ -157,10 +158,8 @@ theorem h2  { m n  : Nat}:  (n : Ordinal.{0}) ≤  m ↔ n ≤  m := by
 theorem ord_cmp {a1 a2 b1 b2 : Nat} : (a1 * Ordinal.omega0  + b1 <  a2 * Ordinal.omega0  + b2) ↔ (a1 < a2 ∨ (a1 = a2 ∧ b1 < b2)) := by
   sorry
   -- sorry
-noncomputable def ackRank : OrdinalRankingFunction.{0} AckSystem where
-  rank := ackRankf
 
-  rank_le_of_rel_fair := fun s1 s2 t =>
+theorem ackRank_fair (s1 s2 : ℕ × List ℕ) (t : AckSystem.R s1 s2) (reach : State.IsReachable (a := AckSystem) s1 ):   AckSystem.F s1 → ackRankf s2 < ackRankf s1  :=
    match s1 with
       | (n, []) => by
         simp [AckSystem, ackRankf, ackStep] at t
@@ -173,7 +172,7 @@ noncomputable def ackRank : OrdinalRankingFunction.{0} AckSystem where
           Nat.cast_zero, List.length_reverse, zero_mul, List.sum_append, List.sum_cons,
           List.sum_nil, add_zero, add_lt_add_iff_left]
         simp
-        rw [f]
+        rw [f (n := n)]
         repeat rw [g]
         rw [h]
         simp [ackMax2]
@@ -210,6 +209,10 @@ noncomputable def ackRank : OrdinalRankingFunction.{0} AckSystem where
         repeat rw [add_assoc]
         simp
         sorry
+noncomputable def ackRank : OrdinalRankingFunction.{0} AckSystem where
+  rank := ackRankf
+
+  rank_le_of_rel_fair := ackRank_fair
 
   rank_le_of_rel_unfair := fun s1 s2 t =>
    match s1 with

@@ -280,6 +280,7 @@ theorem lookup_succ {R : S → S → Prop} {a b : S}
 /-
 The 0-th vertex of a path is its start: `lookup p 0 = a`.
 -/
+@[simp]
 theorem lookup_zero {a b : S} {R : S → S → Prop} (p : Path R a b) : p.lookup 0 = a := by
   induction' p with x y a_to_x x_to_y  ih
   <;> simp only [Path.lookup, ge_iff_le, nonpos_iff_eq_zero]
@@ -290,6 +291,7 @@ theorem lookup_zero {a b : S} {R : S → S → Prop} (p : Path R a b) : p.lookup
 /-
 Length of concatenation: `length (p1 ⧺ p2) = length p1 + length p2`.
 -/
+@[simp]
 theorem concat_len {a b c : S} {R : S → S → Prop}
     (p1 : Path R a b) (p2 : Path R b c) :
     (Path.concat p1 p2).length = p1.length + p2.length :=
@@ -304,6 +306,7 @@ theorem concat_len {a b c : S} {R : S → S → Prop}
 Lookup on the concatenation, right part: for `n`,
 `lookup (p1 ⧺ p2) (length p1 + n) = lookup p2 n`.
 -/
+@[simp]
 theorem lookup_concat {a b c :S} {R : S → S → Prop}
     {p1 : Path R a b} {p2 : Path R b c} {n : Nat} :
     (Path.concat p1 p2).lookup (p1.length + n) = p2.lookup n :=
@@ -316,6 +319,18 @@ theorem lookup_concat {a b c :S} {R : S → S → Prop}
       have y := lookup_concat (p1 := p1) (p2 := p1_snoc) (n := n)
       simp only [Path.concat_tail, Path.lookup, Path.length, concat_len, Nat.succ_eq_add_one,
         add_assoc, ge_iff_le, add_le_add_iff_left, y]
+
+/-
+Lookup on the concatenation, right part: for `n`,
+`lookup (p1 ⧺ p2) (length p1 + n) = lookup p2 n`.
+-/
+@[simp]
+theorem lookup_concat_end {a b c :S} {R : S → S → Prop}
+    {p1 : Path R a b} {p2 : Path R b c} :
+    (Path.concat p1 p2).lookup (p1.length) = b := by
+    have : p1.length = p1.length + 0 := by simp only [add_zero]
+    rw [this]
+    simp only [lookup_concat, lookup_zero]
 
 
 /-
