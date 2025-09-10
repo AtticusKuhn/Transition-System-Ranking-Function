@@ -5,6 +5,7 @@ mkShell {
     pkgs.unzip
     pkgs.aider-chat
     pkgs.codex
+    pkgs.uv
   ];
 shellHook = ''
 # lake exe cache get!

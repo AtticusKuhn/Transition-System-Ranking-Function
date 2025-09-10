@@ -1,0 +1,4 @@
+# IMPORTANT: the top-level key is `mcp_servers` rather than `mcpServers`.
+[mcp_servers.lean4]
+command = "uvx"
+args = ["lean-lsp-mcp"]

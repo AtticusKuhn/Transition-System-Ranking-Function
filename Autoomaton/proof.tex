@@ -1,0 +1,132 @@
+
+\documentclass{article}
+\usepackage{amsmath,amsfonts,amssymb}
+
+\newcommand{\sign}{\operatorname{sign}}
+\newcommand{\relu}{\operatorname{ReLU}}
+\newcommand{\NN}{\mathbb{N}}
+\newcommand{\ZZ}{\mathbb{Z}}
+
+\title{Completeness of Neural Ranking Functions with Tight Equality and Wide Conjunction Gadgets}
+\author{Atticus Kuhn}
+\date{September 2025}
+
+\begin{document}
+\maketitle
+
+\section{Theorem and Conventions}
+
+\begin{flushleft}
+\textbf{Theorem.}
+Let $S \subset \NN^m$ be finite and let $r : S \to \NN$. Then there exists a neural ranking function $N$ of the form
+\[
+N(\mathbf{x}) \;=\; \bigl(A \mathbf{x} + \mathbf{c}\bigr) \cdot \bigl(\max(0, \mathbf{y}_L(\mathbf{x}))\bigr),
+\qquad \text{where }\;\mathbf{y}_0 = \mathbf{x},\;\; \mathbf{y}_{\ell}=\sign\!\bigl(W_{\ell}\mathbf{y}_{\ell-1}+ \mathbf{b}_{\ell}\bigr),
+\]
+with $\sign$ and $\max(0,\cdot)$ applied elementwise, such that $N(\mathbf{x}) = r(\mathbf{x})$ for all $\mathbf{x}\in S$.
+\end{flushleft}
+
+\begin{flushleft}
+\textbf{Conventions.}
+We use $\sign(t)=1$ if $t>0$ and $\sign(t)=-1$ if $t<0$.
+We avoid $0$ arguments to $\sign$ by using half-integer thresholds whenever sums of integers are thresholded.
+\end{flushleft}
+
+\section{Improved Gadgets}
+
+\subsection*{Tight per-coordinate equality}
+
+\begin{flushleft}
+For $x,a\in\ZZ$, define the two tight thresholds around $a$:
+\[
+s^{-}(x,a)\;=\;\sign\!\bigl(2x-(2a-1)\bigr),\qquad
+s^{+}(x,a)\;=\;\sign\!\bigl(2x-(2a+1)\bigr).
+\]
+Because inputs are integers, these arguments are odd integers and hence never $0$.
+
+Your proposed indicator
+\[
+h(x,a)\;=\;\sign\!\Bigl(s^{-}(x,a)-s^{+}(x,a)\Bigr)
+\]
+satisfies $h(x,a)=1$ iff $x=a$ and $h(x,a)=0$ otherwise, but it evaluates $\sign(0)$ when $x\neq a$. To preserve our no-ties convention inside the network, we implement the following \emph{equivalent, $\{\pm1\}$-valued} equality test:
+\[
+e(x,a)\;=\;\sign\!\Bigl(s^{-}(x,a)-s^{+}(x,a)-1\Bigr)\;\in\;\{1,-1\},
+\]
+which obeys $e(x,a)=1$ iff $x=a$, and $e(x,a)=-1$ otherwise. Indeed, $s^{-}-s^{+}\in\{2,0\}$ with value $2$ iff $x=a$.
+\end{flushleft}
+
+\subsection*{Wide $n$-ary conjunction}
+
+\begin{flushleft}
+Given bits $a_1,\dots,a_n\in\{0,1\}$, your aggregator
+\[
+z(a_1,\dots,a_n)\;=\;\sign\!\Bigl(\sum_{i=1}^n a_i - (n-1)\Bigr)
+\]
+returns $1$ iff all $a_i=1$ and $-1$ otherwise; to avoid a zero argument we can equivalently use $\sign(\sum a_i - (n-\tfrac12))$ on integer inputs.
+
+In our $\{\pm1\}$-coded setting, let $u_1,\dots,u_n\in\{-1,1\}$ with $u_i=1$ encoding “true.” Then the single-shot AND is
+\[
+Z(u_1,\dots,u_n)\;=\;\sign\!\Bigl(\sum_{i=1}^n u_i - (n-1)\Bigr),
+\]
+which equals $1$ iff $u_i=1$ for all $i$, and $-1$ otherwise. Note there is no tie: the sum is $n$ in the all-true case and at most $n-2$ otherwise.
+\end{flushleft}
+
+\section{Vector equality in one shot}
+
+\begin{flushleft}
+Fix $\mathbf{a}=(a_1,\dots,a_m)\in\ZZ^m$. We define a one-shot vector-equality test
+\[
+T_{\mathbf{a}}(\mathbf{x})\;=\;\sign\!\Bigl(\sum_{j=1}^m e(x_j,a_j)\;-\;(m-1)\Bigr)\;\in\;\{1,-1\}.
+\]
+Then $T_{\mathbf{a}}(\mathbf{x})=1$ iff $x_j=a_j$ for all $j$, and $-1$ otherwise. This is the $\{\pm1\}$-coded counterpart of your concise expression
+\[
+y\;=\;\sign\!\Bigl(\sum_{j=1}^m h(x_j,a_j)-(m-1)\Bigr),
+\]
+which, with $h\in\{0,1\}$, equals $1$ iff all coordinates match and $-1$ otherwise (replace $m-1$ by $m-\tfrac12$ to avoid $\sign(0)$). The two forms are equivalent up to an affine recoding of the inputs to the final $\sign$.
+\end{flushleft}
+
+\section{Realizability inside the NRF architecture}
+
+\begin{flushleft}
+We show that for each $\mathbf{a}\in S$ the map $T_{\mathbf{a}}(\cdot)$ is realized by three $\sign$-layers, in parallel across all $\mathbf{a}\in S$:
+
+1) First layer (per-coordinate tight thresholds, all $\mathbf{a}\in S$ in parallel):
+\[
+\text{compute } s^{-}(x_j,a_j)=\sign\!\bigl(2x_j-(2a_j-1)\bigr),\quad
+s^{+}(x_j,a_j)=\sign\!\bigl(2x_j-(2a_j+1)\bigr).
+\]
+
+2) Second layer (per-coordinate equality tests, all $\mathbf{a}\in S$ in parallel):
+\[
+e(x_j,a_j)\;=\;\sign\!\Bigl(s^{-}(x_j,a_j)-s^{+}(x_j,a_j)-1\Bigr)\;\in\;\{1,-1\}.
+\]
+
+3) Third layer (wide $m$-ary conjunction, independently for each $\mathbf{a}\in S$):
+\[
+T_{\mathbf{a}}(\mathbf{x})\;=\;\sign\!\Bigl(\sum_{j=1}^m e(x_j,a_j)-(m-1)\Bigr)\;\in\;\{1,-1\}.
+\]
+
+Collect these into the final pre-activation vector $\mathbf{y}_L(\mathbf{x})$ (with $L=3$):
+\[
+\bigl(\mathbf{y}_L(\mathbf{x})\bigr)_{\mathbf{a}}\;=\;T_{\mathbf{a}}(\mathbf{x})\in\{1,-1\},\qquad \mathbf{a}\in S.
+\]
+Therefore, $\relu\bigl(\mathbf{y}_L(\mathbf{x})\bigr)$ is the one-hot indicator vector $\bigl(\mathbf{1}_{\{\mathbf{x}=\mathbf{a}\}}\bigr)_{\mathbf{a}\in S}$.
+\end{flushleft}
+
+\section{Completion of the construction}
+
+\begin{flushleft}
+Index $S=\{\mathbf{s}^{(1)},\dots,\mathbf{s}^{(n)}\}$. Set $A=\mathbf{0}\in\mathbb{R}^{n\times m}$ and $\mathbf{c}\in\NN^n$ by $c_i = r\bigl(\mathbf{s}^{(i)}\bigr)$. Define
+\[
+N(\mathbf{x}) \;=\; \bigl(A\mathbf{x}+\mathbf{c}\bigr)\cdot \relu\!\bigl(\mathbf{y}_L(\mathbf{x})\bigr)
+\;=\; \sum_{i=1}^n c_i \,\relu\!\bigl( T_{\mathbf{s}^{(i)}}(\mathbf{x}) \bigr)
+\;=\; \sum_{i=1}^n r\bigl(\mathbf{s}^{(i)}\bigr)\, \mathbf{1}_{\{\mathbf{x}=\mathbf{s}^{(i)}\}}.
+\]
+Thus $N(\mathbf{x})=r(\mathbf{x})$ for all $\mathbf{x}\in S$, and $N(\mathbf{x})\in\NN$ for all $\mathbf{x}$ since each summand is nonnegative and at most one indicator is $1$.
+
+This $N$ has the required NRF form. Compared to the recursive conjunction, the conjunction here is realized in a \emph{single} sign layer (after equality tests), yielding constant sign-depth $L=3$ independent of $m$.
+\qed
+\end{flushleft}
+
+\end{document}
+
