@@ -169,7 +169,7 @@ end Helpers
 -- Final completeness theorem matching the statement in proof.tex
 theorem completeness {m : Nat}
     (S : Finset (Fin m → ℤ)) (r : (Fin m → ℤ) → ℤ) :
-    ∃ (g : ((Fin m → Int) → (Int))),
+    ∃ (g : (Fin m → Int) → Int),
       isNRF_complete g ∧ ∀ x ∈ S, g x = r x := by
   classical
   let k : Nat := S.card
@@ -249,4 +249,5 @@ theorem completeness {m : Nat}
     -- Conclude `g x = r x` using the definition of `b`
     simpa [b, s_i0] using hdot
 
-#print axioms completeness
+/-- info: 'completeness' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in #print axioms completeness
