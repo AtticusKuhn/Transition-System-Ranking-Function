@@ -132,6 +132,21 @@ inductive isNRF : {m n: Nat} → ((Fin m → Int) → (Fin n → Int)) → Prop 
       (hf : isNRF f) (hg : isNRF g) :
       isNRF (fun x => appendVec (f x) (g x))
 
+
+inductive isNRFNeurons : {m n: Nat} → ((Fin m → Int) → (Fin n → Int)) → Nat → Prop where
+  | id : isNRFNeurons (fun x => x) 0
+  | layer {m n k : Nat}
+      (W : Matrix (Fin m) (Fin n) Int) (b : Fin m → Int)
+      {f : (Fin k → Int) → (Fin n → Int)}
+      {l : Nat}
+      (hf : isNRFNeurons f l)
+      : isNRFNeurons (fun x => signMap ((Matrix.mulVec W (f x)) + b)) (l + m)
+  | pair {m n p : Nat}
+      {f : (Fin m → Int) → (Fin n → Int)} {g : (Fin m → Int) → (Fin p → Int)}
+      {a b : Nat}
+      (hf : isNRFNeurons f a ) (hg : isNRFNeurons g b) :
+      isNRFNeurons (fun x => appendVec (f x) (g x)) (a + b)
+
 def g (a : Int) (x : Fin 1 → Int) : Fin 1 → Int := fun i => if (x i) = a then 1 else -1
 
 -- \operatorname{sign}(2\operatorname{sign}(2*x-2a+1)+2\operatorname{sign}(-2*x+2*a+1)-3)
@@ -202,6 +217,11 @@ theorem nrf_g2 {a : Int}: isNRF (g2 a) := by
   apply isNRF.layer
   exact isNRF.id
 
+  theorem nrf_neurons_g2 {a : Int}: isNRFNeurons (g2 a) 3 := by
+  apply isNRFNeurons.layer
+  apply isNRFNeurons.layer
+  exact isNRFNeurons.id
+
 theorem g_eq_2 : g2 = g' := by
   funext a x i
   -- `Fin 1` has a single index; replace `i` by `0` to simplify coordinates
@@ -224,6 +244,11 @@ theorem nrf_g' {a : Int}: isNRF (g' a) := by
 theorem nrf_g {a : Int} : isNRF (g a) := by
   have h := congrArg (fun f => f a) g_eq
   simpa [h] using nrf_g' (a := a)
+
+theorem nrf_neurons_g {a : Int} : isNRFNeurons (g a) 3 := by
+  simp [g_eq, ← g_eq_2]
+  exact nrf_neurons_g2
+
 
 #print axioms nrf_g
 
@@ -356,11 +381,33 @@ theorem isNRF_f3  {w : Nat} (a : Fin w → Int) : isNRF (f3 a) := by
   apply isNRF.layer
   apply isNRF.id
 
+
+theorem isNRF_neurons_f3  {w : Nat} (a : Fin w → Int) :
+    isNRFNeurons (f3 a) (w + w + w + 1) := by
+  apply isNRFNeurons.layer (W := (fun _ _ => (1 : Int))) (b := fun _ => -((w : Int) - 1))
+  apply isNRFNeurons.layer (W := W2 (w := w)) (b := b2 (w := w))
+  have x :=  isNRFNeurons.layer (W := W1 (w := w) (a := a)) (b := b1 (w := w) (a := a)) isNRFNeurons.id
+  simp only [zero_add] at x
+  exact x
+
+theorem isNRF_neurons_f3'  {w : Nat} (a : Fin w → Int) :
+    isNRFNeurons (f3 a) (3 * w + 1) := by
+  have : 3 * w + 1 = (w + w + w + 1) := by omega
+  simp only [this]
+  exact isNRF_neurons_f3 a
+
 theorem isNRF_f  {w : Nat} (a : Fin w → Int) : isNRF (f a) := by
   simp only [f_eq_f2, f2_eq_f3]
   exact isNRF_f3 a
 
+
+theorem isNRF_neurons_f  {w : Nat} (a : Fin w → Int) : isNRFNeurons (f a) (3 * w + 1) := by
+  simp only [f_eq_f2, f2_eq_f3]
+  exact isNRF_neurons_f3' a
+
 #print axioms isNRF_f
+
+#print axioms isNRF_neurons_f
 
 def in_range (a b : Int)  (x : Fin 1 → Int):  Fin 1 → Int := fun _ => if a < (x 0) ∧ (x 0) < b then 1 else -1
 
@@ -381,6 +428,10 @@ theorem is_NRF_in_range_2  (a b : Int) : isNRF (in_range_2 a b) := by
   apply isNRF.layer
   exact isNRF.id
 
+theorem is_NRF_neurons_in_range_2  (a b : Int) : isNRFNeurons (in_range_2 a b) 3:= by
+  apply isNRFNeurons.layer
+  apply isNRFNeurons.layer
+  exact isNRFNeurons.id
 
 theorem if_le (c : Prop) [Decidable c]: 0 < (if c then 1 else -1) ↔ c := by
   by_cases ct : c
@@ -584,7 +635,6 @@ def in_range_vec {w: Nat} (a b : Fin w → Int)  (x : Fin w → Int):  Fin w →
 -- Pointwise order on functions: x < y ↔ (x ≤ y) ∧ ∃ i, x i < y i
 theorem vec_lt_iff  {w: Nat} (a b : Fin w → Int) :
     (a < b) ↔ ((∀ (i : Fin w), a i ≤ b i) ∧ ∃ (i : Fin w), a i < b i) := by
-  classical
   constructor
   · intro h
     -- Unfold the `Pi`-order strict inequality
@@ -693,6 +743,19 @@ def broadcast1 {w : Nat} (y : Fin 1 → Int) : Fin w → Int :=
 def in_range_vec_2 {w : Nat} (a b : Fin w → Int) (x : Fin w → Int) : Fin w → Int :=
   broadcast1 (in_range_vec_core a b x)
 
+def isNRF_neurons_in_range_vec_2  {w : Nat} (a b : Fin w → Int) : isNRFNeurons (in_range_vec_2 a b) ((w + w + w) + 1 + w) := by
+  apply isNRFNeurons.layer
+  apply isNRFNeurons.layer
+  apply isNRFNeurons.layer
+  have x :=  isNRFNeurons.layer (W := W1 (w := w) (a := a)) (b := b1_range a b) isNRFNeurons.id
+  simp only [zero_add] at x
+  exact x
+
+def isNRF_neurons_in_range_vec_2'  {w : Nat} (a b : Fin w → Int) : isNRFNeurons (in_range_vec_2 a b) (4 * w + 1) := by
+  have : 4 * w + 1 =(w + w + w) + 1 + w := by omega
+  simp only [this]
+  exact isNRF_neurons_in_range_vec_2 a b
+
 -- Prove equivalence of the spec and the constructed two-layer+aggregate network
 lemma in_range_vec_eq {w : Nat} (a b : Fin w → Int) :
     in_range_vec a b = in_range_vec_2 a b := by
@@ -750,6 +813,15 @@ lemma in_range_vec_eq {w : Nat} (a b : Fin w → Int) :
             Fin.sum_univ_one, signInt]
     have hlhs : (in_range_vec a b x) j = -1 := by simp [in_range_vec, hall]
     simpa [hlhs, hrhs]
+
+-- Neuron count for the vector in-range tester, via equality with the constructed network
+theorem isNRF_neurons_in_range_vec  {w : Nat} (a b : Fin w → Int) :
+    isNRFNeurons (in_range_vec a b) (4 * w + 1) := by
+  -- Rewrite to the layered construction and reuse its neuron count
+  simp only [in_range_vec_eq (a := a) (b := b)]
+  exact isNRF_neurons_in_range_vec_2' a b
+
+#print axioms isNRF_neurons_in_range_vec
 
 -- Show the constructed function is an NRF by stacking four layers
 theorem nrf_in_range_vec {w: Nat} (a b : Fin w → Int) : isNRF (in_range_vec a b) := by
