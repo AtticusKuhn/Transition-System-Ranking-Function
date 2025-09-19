@@ -20,6 +20,9 @@ inductive isNRF_complete : {m: Nat} → ((Fin m → Int) → Int) → Prop where
 
 open Classical
 
+
+
+
 -- Enumerate a finite set `S` as `Fin k → _` where `k = S.card`.
 noncomputable def enumOfFinset {α : Type} (S : Finset α) : Fin S.card → {x // x ∈ S} :=
   (S.equivFin).symm

@@ -7,3 +7,5 @@ import Autoomaton.Ordinal2
 import Autoomaton.Path
 import Autoomaton.succeeds
 import Autoomaton.completeness
+import Autoomaton.completeNeurons
+import Autoomaton.isNRFNeurons

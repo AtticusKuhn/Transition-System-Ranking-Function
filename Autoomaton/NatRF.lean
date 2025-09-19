@@ -120,7 +120,7 @@ noncomputable def fair_count (s1 : S) [fin : Finite S] : Nat :=
 
 theorem lt_le (a b : Nat) : (a  + 1 ≤ b) ↔ (a < b) := by omega
 
-noncomputable def completeness [fin : Finite S] (a : Automaton S) (fe : a.IsFairEmpty) : RankingFunction a := {
+noncomputable def finite_completeness [fin : Finite S] (a : Automaton S) (fe : a.IsFairEmpty) : RankingFunction a := {
   rank := fun s => fair_count (a := a) s,
   reach := State.IsReachable (a := a),
   init_reach := init_reachable (a := a),
@@ -155,4 +155,4 @@ noncomputable def completeness [fin : Finite S] (a : Automaton S) (fe : a.IsFair
     · exact Finset.card_le_card f_subset
 }
 
-#print axioms completeness
+#print axioms finite_completeness
