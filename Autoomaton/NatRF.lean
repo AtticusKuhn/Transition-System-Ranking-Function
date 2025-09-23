@@ -155,4 +155,11 @@ noncomputable def finite_completeness [fin : Finite S] (a : Automaton S) (fe : a
     · exact Finset.card_le_card f_subset
 }
 
+theorem finite_fairempty_iff_rankingfunction [fin : Finite S] : a.IsFairEmpty ↔ Nonempty (RankingFunction a) := by
+  constructor
+  · intro fe
+    exact ⟨ finite_completeness a fe⟩
+  · intro rf
+    exact isFairEmpty_of_rankingFunction (Classical.choice rf)
+
 #print axioms finite_completeness

@@ -5,15 +5,16 @@ import Autoomaton.succeeds
 
 
 namespace ordinal2
-variable {S A: Type} [Preorder A] [WellFoundedLT A] {a : Automaton S} (r : Run a)
-
+-- universe u
 universe u
+variable {S : Type} {A : Type u} [Preorder A] [WellFoundedLT A] {a : Automaton S} (r : Run a)
+
 
 /-- An ordinal-valued ranking function for a Büchi automaton maps states to ordinals.
 The rank must not increase along transitions. If the source state of a transition is fair, the rank must strictly decrease.
 This is a more general form of a ranking function.
 -/
-structure OrdinalRankingFunction {S: Type} (A : Type u) [Preorder A]  [WellFoundedLT A] (a : Automaton S) : Type u where
+structure OrdinalRankingFunction {S: Type} (A : Type u) [Preorder A]  [w : WellFoundedLT A] (a : Automaton S) : Type u where
   /-- The ranking function $W: S \to \text{Ordinal}$. -/
   rank : S → A
   reach : S → Prop
@@ -167,6 +168,13 @@ noncomputable def ordinalRankingFunction_of_isFairEmpty (fe : a.IsFairEmpty) : (
     have := LT.lt.not_ge c
     contradiction
   }
+
+theorem fair_empty_iff_ranking_function : a.IsFairEmpty ↔ Nonempty (OrdinalRankingFunction (Ordinal.{0}) a) := by
+  constructor
+  · intro fe
+    exact ⟨ordinalRankingFunction_of_isFairEmpty fe ⟩
+  · intro rf
+    exact isFairEmpty_of_ordinalRankingFunction (Classical.choice rf)
 
 --info: 'ordinalRankingFunction_of_isFairEmpty' depends on axioms: [propext, Classical.choice, Quot.sound]
 #print axioms ordinalRankingFunction_of_isFairEmpty

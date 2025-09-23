@@ -44,7 +44,7 @@ variable {S : Type} {a : Automaton S} (r : Run a)
 /-- A run `r` is fair if it visits the set of fair states infinitely often.
 This is expressed as $\forall n \in \mathbb{N}, \exists k > n, f(k) \in F$. -/
 @[simp]
-def Run.IsFair : Prop := ∀ (n : Nat), ∃ (k : Nat), k > n ∧ a.F (r.f k)
+def Run.IsFair : Prop := ∀ (n : ℕ), ∃ (k : Nat), k > n ∧ a.F (r.f k)
 def Run.IsFair2 : Prop := ∀ (n : Nat), ∃ (k : Nat), k ≥ n ∧ a.F (r.f k)
 
 theorem fair_iff_fair2 : r.IsFair ↔ r.IsFair2 := by

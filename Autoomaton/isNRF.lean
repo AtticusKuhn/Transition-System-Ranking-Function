@@ -42,7 +42,6 @@ lemma sum_if_one_neg_one_eq (p : Fin w → Prop) [DecidablePred p] :
       nsmul_eq_mul, mul_one]
   have h2 : (∑ i, (if p i then (2 : Int) else 0))
       = ((Finset.univ.filter p).card : Int) * 2 := by
-      classical
       have hsum :
           (∑ i, (if p i then (2 : Int) else 0))
             = (∑ i ∈ (Finset.univ.filter p), (2 : Int)) := by
@@ -289,21 +288,18 @@ def f4 {w : Nat} (a : Fin w → Int) (x : Fin w → Int) : Fin w → Int :=
 -- Coordinate computations for the two layers inside `f4`
 lemma s1_left {w : Nat} (a : Fin w → Int) (x : Fin w → Int) (i : Fin w) :
     s1 a x (i.castAdd w) = signInt (2 * x i - 2 * a i + 1) := by
-  classical
   simp [s1, W1, b1, signMap, Matrix.mulVec, dotProduct, Fin.addCases,
         ite_mul, mul_ite, sum_if_singleton' (i := i), sub_eq_add_neg,
         two_mul, mul_add, add_comm, add_left_comm, add_assoc]
 
 lemma s1_right {w : Nat} (a : Fin w → Int) (x : Fin w → Int) (i : Fin w) :
     s1 a x (i.addNat w) = signInt (2 * a i - 2 * x i + 1) := by
-  classical
   simp [s1, W1, b1, signMap, Matrix.mulVec, dotProduct, Fin.addCases,
         ite_mul, mul_ite, sum_if_singleton' (i := i), sub_eq_add_neg,
         two_mul, mul_add, add_comm, add_left_comm, add_assoc]
 
 lemma mulW2_coord {w : Nat} (s : Fin (w + w) → Int) (i : Fin w) :
     (Matrix.mulVec (W2 (w := w)) s) i = s (i.addNat w) + s (i.castAdd w) := by
-  classical
   simp [W2, Matrix.mulVec, dotProduct, ite_mul, mul_ite, mul_add, add_mul,
         Finset.sum_add_distrib, sum_if_singleton (i := i.addNat w),
         sum_if_singleton (i := i.castAdd w), add_comm, add_left_comm, add_assoc]
@@ -312,7 +308,6 @@ lemma f4_coord_closed {w : Nat} (a : Fin w → Int) (x : Fin w → Int) (i : Fin
     (f4 a x) i
       = signInt ((signInt (2 * x i - 2 * a i + 1)) +
                  (signInt (2 * a i - 2 * x i + 1)) - 1) := by
-  classical
   have hf4i : (f4 a x) i = signInt (((Matrix.mulVec (W2 (w := w)) (s1 a x)) + (b2 (w := w))) i) := by
     simp [f4, signMap, Pi.add_apply]
   have hsumW₂ : (Matrix.mulVec (W2 (w := w)) (s1 a x)) i
@@ -334,7 +329,6 @@ def f3 {w : Nat} (a : Fin w → Int) (x : Fin w → Int) : Fin 1 → Int :=
 
 theorem g_f4 {w : Nat} (a : Fin w → Int) (x : Fin w → Int) (i : Fin w):
     g (a i) (const (x i)) = const ((f4 a x) i) := by
-  classical
   ext j
   have hj : j = 0 := Subsingleton.elim j 0
   simp [g, const, hj]
@@ -475,7 +469,6 @@ lemma two_mul_add_one_lt_iff (x b : Int) : 2 * x + 1 < 2 * b ↔ x < b := by
 theorem in_range_eq : in_range = in_range_2 := by
   funext a b x i
   have hi : i = 0 := Subsingleton.elim i 0
-  classical
   -- Reduce both sides to the single coordinate `0` and expand the two-layer form
   -- so the argument inside the final `signInt` is `s₁ + s₂ - 1`.
   simp [in_range, in_range_2, signMap, in_range_aux, hi, mulW2_in_range,
@@ -495,7 +488,6 @@ theorem in_range_eq : in_range = in_range_2 := by
   let Q : Prop := 0 < Matrix.mulVec (fun (i : Fin 2) x ↦ if i = 0 then 2 else -2) x 1 + (2 * b + -1)
   have hsum : (1 : Int) < ((if P then 1 else -1) + (if Q then 1 else -1))
                 ↔ (a < x 0 ∧ x 0 < b) := by
-    classical
     -- Reduce via the equivalences for each side
     have := (one_lt_sum_if_iff P Q)
     simpa [P, Q, hleft, hright] using this
@@ -634,14 +626,12 @@ def in_range_per_coord {w : Nat} (a b : Fin w → Int) (x : Fin w → Int) : Fin
 -- Coordinate computations mirroring `s1_left/right` but with `-1` biases
 lemma s_range_left {w : Nat} (a b : Fin w → Int) (x : Fin w → Int) (i : Fin w) :
     s_range a b x (i.castAdd w) = signInt (2 * x i - 2 * a i - 1) := by
-  classical
   simp [s_range, W1, b1_range, signMap, Matrix.mulVec, dotProduct, Fin.addCases,
         ite_mul, mul_ite, sum_if_singleton' (i := i), sub_eq_add_neg,
         two_mul, mul_add, add_comm, add_left_comm, add_assoc]
 
 lemma s_range_right {w : Nat} (a b : Fin w → Int) (x : Fin w → Int) (i : Fin w) :
     s_range a b x (i.addNat w) = signInt (2 * b i - 2 * x i - 1) := by
-  classical
   simp [s_range, W1, b1_range, signMap, Matrix.mulVec, dotProduct, Fin.addCases,
         ite_mul, mul_ite, sum_if_singleton' (i := i), sub_eq_add_neg,
         two_mul, mul_add, add_comm, add_left_comm, add_assoc]
@@ -650,7 +640,6 @@ lemma in_range_per_coord_closed {w : Nat} (a b : Fin w → Int) (x : Fin w → I
     in_range_per_coord a b x i
       = signInt ((signInt (2 * x i - 2 * a i - 1)) +
                  (signInt (2 * b i - 2 * x i - 1)) - 1) := by
-  classical
   have hf : (in_range_per_coord a b x) i
               = signInt (((Matrix.mulVec (W2 (w := w)) (s_range a b x)) + (b2 (w := w))) i) := by
     simp [in_range_per_coord, signMap, Pi.add_apply]
@@ -675,7 +664,6 @@ lemma in_range_scalar_closed (a b x : Int) :
 lemma in_range_per_coord_spec {w : Nat} (a b : Fin w → Int)
     (x : Fin w → Int) (i : Fin w) :
     in_range_per_coord a b x i = (if a i < x i ∧ x i < b i then 1 else -1) := by
-  classical
   have hcoord := in_range_per_coord_closed (w := w) (a := a) (b := b) (x := x) (i := i)
   -- From the 1-D equivalence `in_range = in_range_2`, derive the predicate form
   have h1D :
@@ -709,7 +697,6 @@ def in_range_vec_2 {w : Nat} (a b : Fin w → Int) (x : Fin w → Int) : Fin w �
 lemma in_range_vec_eq {w : Nat} (a b : Fin w → Int) :
     in_range_vec a b = in_range_vec_2 a b := by
   funext x j
-  classical
   -- We reason by cases on whether all coordinates are strictly inside
   -- Turn the sign test into the target `if` via the same bound used in `f_eq_f2`.
   -- If every coordinate satisfies the predicate, the sum is `w` ⇒ positive; otherwise ≤ w-1 ⇒ nonpositive.
@@ -718,7 +705,6 @@ lemma in_range_vec_eq {w : Nat} (a b : Fin w → Int) :
     have hterm : ∀ i, in_range_per_coord a b x i = 1 := by
       intro i; simp [in_range_per_coord_spec, hall i]
     have hy : (in_range_vec_core a b x) 0 = 1 := by
-      classical
       simp [in_range_vec_core, Matrix.mulVec, dotProduct, Fin.sum_univ_one,
             hterm, signMap, Pi.add_apply, sub_eq_add_neg, signInt]
     -- RHS: broadcasting preserves the bit
@@ -730,11 +716,9 @@ lemma in_range_vec_eq {w : Nat} (a b : Fin w → Int) :
     simpa [hlhs, hrhs]
   · -- Not all in range ⇒ there exists a failing index and the sum ≤ w - 1
     have hxne : ∃ j : Fin w, ¬ (a j < x j ∧ x j < b j) := by
-      classical
       exact not_forall.mp hall
     have hsum_le : (∑ i, in_range_per_coord a b x i) ≤ (w : Int) - 1 := by
       -- Rewrite via the spec and apply the sum bound
-      classical
       have :=
         sum_if_one_neg_one_le_sub_one (w := w) (p := fun i : Fin w => a i < x i ∧ x i < b i) hxne
       -- Cast the sum shape
@@ -752,7 +736,6 @@ lemma in_range_vec_eq {w : Nat} (a b : Fin w → Int) :
         · exact (h' hpos).elim
         · simpa [signInt, hpos]
       -- Evaluate the core bit explicitly
-      classical
       simpa [in_range_vec_core, signMap, Pi.add_apply, Matrix.mulVec, dotProduct,
              Fin.sum_univ_one, sub_eq_add_neg]
         using hsign
