@@ -110,7 +110,6 @@ lemma sum_pos_iff_all_ones {t : Fin a → Int}
         have : (∑ j, (if j = j0 then (-1 : Int) else 1))
             = (-1) + (∑ j ∈ Finset.univ.erase j0, (1 : Int)) := by
           -- Finset splitting: sum over j0 and others
-          classical
           -- direct by rewriting sum as -1 + sum 1 over remaining indices
           have := Finset.sum_add_sum_compl (s := ({j0} : Finset (Fin a))) (f := fun j => if j = j0 then (-1 : Int) else 1)
           -- simplify; this is a bit heavy; accept as an admitted identity in this context.
@@ -411,7 +410,6 @@ theorem isNRFNeurons_complete_linear_sum'
       (fun x => (dotProduct ((Matrix.mulVec W x) + b') (reluMap (fs x))))
       = (linear_sum (w := w) (a := a) (b := b) C A c low high) := by
     funext x
-    classical
     -- Compare summands pointwise over i : Fin w
     apply Finset.sum_congr rfl
     intro i _
@@ -455,4 +453,7 @@ theorem isNRFNeurons_complete_linear_sum'
   -- Finish: rewrite the neuron count
   simpa [hcount] using hcomplete'
 
-#print axioms isNRFNeurons_complete_linear_sum'
+/--
+info: 'isNRFNeurons_complete_linear_sum'' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in #print axioms isNRFNeurons_complete_linear_sum'

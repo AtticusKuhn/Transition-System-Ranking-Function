@@ -3,7 +3,6 @@ with pkgs;
 mkShell {
   buildInputs = [
     pkgs.unzip
-    pkgs.aider-chat
     pkgs.codex
     pkgs.uv
   ];
